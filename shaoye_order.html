@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>燒夜 Hot Night - 多人點餐 (Google Drive 試算表連動)</title>
+  <title>燒夜 Hot Night - 多人點餐 (批次送出同步版)</title>
   <style>
     :root {
       --bg-dark: #121418;
@@ -13,6 +13,7 @@
       --accent-red: #ef4444;
       --accent-yellow: #eab308;
       --accent-green: #10b981;
+      --accent-blue: #3b82f6;
       --text-main: #f3f4f6;
       --text-muted: #9ca3af;
       --row-even: #1e222a;
@@ -31,21 +32,77 @@
 
     .container { max-width: 1400px; margin: 0 auto; }
 
-    /* 頂部同步狀態橫幅 */
-    .sync-banner {
+    /* 頂部送出與同步操作列 */
+    .submit-panel {
+      background: linear-gradient(135deg, #1e2638, #182030);
+      border: 1px solid var(--accent-blue);
+      border-radius: 12px;
+      padding: 14px 20px;
+      margin-bottom: 16px;
       display: flex;
+      flex-wrap: wrap;
       justify-content: space-between;
       align-items: center;
-      background: #1e2638;
-      border: 1px solid #3b82f6;
-      padding: 8px 16px;
-      border-radius: 8px;
-      margin-bottom: 16px;
-      font-size: 0.88rem;
+      gap: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
     }
 
-    .sync-status {
+    .submit-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .submit-badge {
+      font-size: 0.85rem;
+      background-color: rgba(59, 130, 246, 0.2);
+      color: #93c5fd;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+
+    .select-member {
+      background-color: #272c36;
+      border: 1px solid #4b5563;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .btn-submit-main {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+      font-size: 1rem;
+      font-weight: bold;
+      padding: 9px 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
       display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-submit-main:hover {
+      background: linear-gradient(135deg, #059669, #047857);
+      transform: translateY(-1px);
+    }
+    .btn-submit-main:disabled {
+      background: #4b5563;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .sync-status-indicator {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      display: flex;
       align-items: center;
       gap: 8px;
     }
@@ -54,19 +111,14 @@
       width: 10px;
       height: 10px;
       border-radius: 50%;
-      background-color: #9ca3af;
+      background-color: var(--accent-green);
     }
-    .status-dot.online { background-color: var(--accent-green); box-shadow: 0 0 8px var(--accent-green); }
     .status-dot.syncing { background-color: var(--accent-yellow); animation: pulse 1s infinite; }
     .status-dot.offline { background-color: var(--accent-red); }
 
-    @keyframes pulse {
-      0% { opacity: 0.3; }
-      50% { opacity: 1; }
-      100% { opacity: 0.3; }
-    }
+    @keyframes pulse { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
 
-    /* 頂部儀表板 */
+    /* 頂部統計列 */
     header {
       display: flex;
       flex-wrap: wrap;
@@ -149,17 +201,16 @@
     .btn-secondary { background-color: #374151; color: #e5e7eb; }
     .btn-secondary:hover { background-color: #4b5563; }
     .btn-success { background-color: var(--accent-green); color: white; }
-    .btn-success:hover { background-color: #059669; }
     .btn-danger { background-color: var(--accent-red); color: white; }
 
-    /* 表格設計與凍結 */
+    /* 表格設計與凍結窗格 */
     .table-container {
       overflow-x: auto;
       border-radius: 10px;
       border: 1px solid var(--border-color);
       background-color: var(--card-bg);
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-      max-height: 70vh;
+      max-height: 65vh;
       position: relative;
     }
 
@@ -184,6 +235,12 @@
     tbody tr:nth-child(even) .sticky-col-1, tbody tr:nth-child(even) .sticky-col-2, tbody tr:nth-child(even) .sticky-col-3 { background-color: var(--row-even); }
     tbody tr:hover { background-color: var(--row-hover); }
     tbody tr:hover .sticky-col-1, tbody tr:hover .sticky-col-2, tbody tr:hover .sticky-col-3 { background-color: var(--row-hover); }
+
+    .current-user-col {
+      background-color: rgba(59, 130, 246, 0.08) !important;
+      border-left: 1px dashed var(--accent-blue);
+      border-right: 1px dashed var(--accent-blue);
+    }
 
     .qty-control {
       display: inline-flex;
@@ -251,14 +308,24 @@
 <body>
 
   <div class="container">
-    <!-- 雲端同步狀態顯示 -->
-    <div class="sync-banner">
-      <div class="sync-status">
-        <span class="status-dot online" id="status-dot"></span>
-        <span id="sync-status-text">🟢 Google Drive 雲端同步正常 (每 5 秒自動更新)</span>
+    <!-- 批次送出操作面板 -->
+    <div class="submit-panel">
+      <div class="submit-left">
+        <span class="submit-badge">點餐身分</span>
+        <select id="current-user-select" class="select-member" onchange="switchCurrentUser()">
+          <!-- 動態填入成員 -->
+        </select>
+        <button class="btn-submit-main" id="btn-submit-order" onclick="submitMyOrderToCloud()">
+          🚀 送出我的點餐到雲端
+        </button>
+        <button class="btn-secondary" onclick="fetchFromGoogleDrive(true)">
+          🔄 取得雲端最新點單
+        </button>
       </div>
-      <div>
-        <button class="btn-secondary" style="padding: 4px 10px; font-size:0.8rem;" onclick="fetchFromGoogleDrive(true)">🔄 立即重新整理</button>
+
+      <div class="sync-status-indicator">
+        <span class="status-dot" id="status-dot"></span>
+        <span id="sync-status-text">本機隨意點選，點擊「送出」後才上傳同步</span>
       </div>
     </div>
 
@@ -268,7 +335,7 @@
         <div class="brand-badge">燒夜</div>
         <div>
           <h2>多人點餐與費用統計矩陣</h2>
-          <div class="brand-subtitle">Google Drive 試算表即時連線版本</div>
+          <div class="brand-subtitle">Google Drive 試算表 (批次送出防衝突版)</div>
         </div>
       </div>
       <div class="stats-bar">
@@ -290,13 +357,13 @@
     <!-- 工具列 -->
     <div class="toolbar">
       <div class="member-controls">
-        <input type="text" id="new-member-name" placeholder="輸入姓名/暱稱..." maxlength="10">
+        <input type="text" id="new-member-name" placeholder="新增人員姓名..." maxlength="10">
         <button class="btn-primary" onclick="addMember()">＋ 新增人員</button>
       </div>
       <div class="action-controls">
         <button class="btn-secondary" onclick="openKitchenModal()">📋 店家劃單彙整</button>
         <button class="btn-success" onclick="openShareModal()">💬 複製 LINE 明細</button>
-        <button class="btn-danger" onclick="resetAllOrders()">🔄 清空所有數量</button>
+        <button class="btn-danger" onclick="resetAllOrders()">🗑️ 清空所有點單</button>
       </div>
     </div>
 
@@ -308,7 +375,7 @@
             <th class="sticky-col-1">分類</th>
             <th class="sticky-col-2">品項名稱</th>
             <th class="sticky-col-3">單價</th>
-            <!-- 動態人員欄位 -->
+            <!-- 動態人員 -->
             <th class="col-summary-qty">店家劃單總量</th>
             <th class="col-summary-amount">品項小計</th>
           </tr>
@@ -363,9 +430,10 @@
     // ==========================================
     // ⚠️ 請填入您的 Google Apps Script Web App 網址 ⚠️
     // ==========================================
-    const GOOGLE_GAS_API_URL = "https://script.google.com/macros/s/AKfycbwFvuEqvZ7Y3cc2jykLv47ReiadY4tQoTVzvkzCbyzpKV2ITaRn-voo1lR4AXZh4bcAUg/exec";
+    const GOOGLE_GAS_API_URL = "https://script.google.com/macros/s/AKfycbwFvuEqvZ7Y3cc2jykLv47ReiadY4tQoTVzvkzCbyzpKV2ITaRn-voo1lR4AXZh4bcAUg/exec
+";
 
-    // 完整 48 項菜單資料
+    // 48 項完整菜單
     const MENU_DATA = [
       { id: "A01", category: "鹽烤串燒", name: "牛肋串 (鹽烤)", price: 50, unit: "串" },
       { id: "A02", category: "鹽烤串燒", name: "翼板牛肉串 (鹽烤)", price: 56, unit: "串" },
@@ -417,23 +485,21 @@
       { id: "D08", category: "燒烤單點", name: "醬烤四季豆", price: 60, unit: "份" }
     ];
 
-    let members = JSON.parse(localStorage.getItem("shaoye_members")) || ["jim", "Ying", "Jia"];
+    let members = JSON.parse(localStorage.getItem("shaoye_members")) || ["Jim", "Ying", "Jia"];
     let orders = JSON.parse(localStorage.getItem("shaoye_orders")) || {};
-    let isSaving = false;
-    let saveTimeout = null;
+    let currentUser = localStorage.getItem("shaoye_current_user") || members[0];
+    let isSubmitting = false;
 
-    // 初始化
     function init() {
+      renderUserSelect();
       renderTable();
       calculateAll();
 
-      // 如果有填入 API 網址，開始與 Google Drive 同步
+      // 開啟時只從 Google 試算表拉取一次最新點餐
       if (GOOGLE_GAS_API_URL && !GOOGLE_GAS_API_URL.includes("您的部署ID")) {
-        fetchFromGoogleDrive();
-        // 每 5 秒自動跟 Google 試算表輪詢同步最新狀態
-        setInterval(fetchFromGoogleDrive, 5000);
+        fetchFromGoogleDrive(false);
       } else {
-        updateStatus("offline", "⚠️ 尚未填入 Google Apps Script 網址，目前為單機 LocalStorage 模式");
+        updateStatus("offline", "⚠️ 未填入 Google 網址，目前為單機 LocalStorage 模式");
       }
     }
 
@@ -444,10 +510,32 @@
       text.innerText = msg;
     }
 
-    // 從 Google Drive 試算表拉取資料
+    function renderUserSelect() {
+      const select = document.getElementById("current-user-select");
+      select.innerHTML = "";
+      if (!members.includes(currentUser)) {
+        currentUser = members[0] || "";
+      }
+      members.forEach(m => {
+        const opt = document.createElement("option");
+        opt.value = m;
+        opt.innerText = `我是：${m}`;
+        if (m === currentUser) opt.selected = true;
+        select.appendChild(opt);
+      });
+    }
+
+    function switchCurrentUser() {
+      currentUser = document.getElementById("current-user-select").value;
+      localStorage.setItem("shaoye_current_user", currentUser);
+      renderTable();
+      calculateAll();
+    }
+
+    // 從 Google Drive 試算表取得全單
     function fetchFromGoogleDrive(isManual = false) {
-      if (isSaving) return; // 正在寫入時不拉取，防止覆蓋衝突
-      if (isManual) updateStatus("syncing", "🔄 正在從 Google 試算表同步資料...");
+      if (isSubmitting) return;
+      updateStatus("syncing", isManual ? "🔄 正在從 Google 試算表拉取最新點單..." : "連線中...");
 
       fetch(GOOGLE_GAS_API_URL)
         .then(res => res.json())
@@ -457,52 +545,73 @@
             orders = res.data.orders || orders;
             localStorage.setItem("shaoye_members", JSON.stringify(members));
             localStorage.setItem("shaoye_orders", JSON.stringify(orders));
+            renderUserSelect();
             renderTable();
             calculateAll();
-            updateStatus("online", `🟢 Google Drive 雲端同步正常 (${new Date().toLocaleTimeString()} 已更新)`);
+            updateStatus("online", `🟢 已同步至最新資料 (${new Date().toLocaleTimeString()})`);
           }
         })
         .catch(err => {
-          console.warn("Google Drive 同步失敗:", err);
-          updateStatus("offline", "⚠️ Google Drive 連線異常，已切換為本機儲存");
+          console.warn("拉取失敗:", err);
+          updateStatus("offline", "⚠️ 無法連線至 Google 試算表，維持本機資料");
         });
     }
 
-    // 發送資料儲存到 Google Drive 試算表 (防抖延遲 500ms 避免頻繁發送)
-    function triggerSaveToGoogleDrive() {
-      // 先存本機
-      localStorage.setItem("shaoye_members", JSON.stringify(members));
-      localStorage.setItem("shaoye_orders", JSON.stringify(orders));
+    // 核心功能：一次選完畢，點擊按鈕送出
+    function submitMyOrderToCloud() {
+      if (!currentUser) return alert("請先選擇或新增您的姓名！");
+      if (!GOOGLE_GAS_API_URL || GOOGLE_GAS_API_URL.includes("您的部署ID")) {
+        return alert("請先在 HTML 內設定您的 Google Apps Script 網址！");
+      }
 
-      if (!GOOGLE_GAS_API_URL || GOOGLE_GAS_API_URL.includes("您的部署ID")) return;
+      const btn = document.getElementById("btn-submit-order");
+      btn.disabled = true;
+      btn.innerText = "⏳ 正在傳送至 Google 試算表...";
+      updateStatus("syncing", "⏳ 正在將點單送出至雲端...");
+      isSubmitting = true;
 
-      clearTimeout(saveTimeout);
-      updateStatus("syncing", "⏳ 正在同步儲存至 Google 試算表...");
+      const payload = {
+        action: "update_member",
+        targetMember: currentUser,
+        memberOrders: orders[currentUser] || {},
+        members: members,
+        menuSummary: MENU_DATA
+      };
 
-      saveTimeout = setTimeout(() => {
-        isSaving = true;
-        const payload = {
-          members: members,
-          orders: orders,
-          menuSummary: MENU_DATA
-        };
+      fetch(GOOGLE_GAS_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(res => {
+        isSubmitting = false;
+        btn.disabled = false;
+        btn.innerText = "🚀 送出我的點餐到雲端";
 
-        fetch(GOOGLE_GAS_API_URL, {
-          method: "POST",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify(payload)
-        })
-        .then(res => res.json())
-        .then(res => {
-          isSaving = false;
-          updateStatus("online", `🟢 已同步儲存至 Google 試算表 (${new Date().toLocaleTimeString()})`);
-        })
-        .catch(err => {
-          isSaving = false;
-          console.error("儲存失敗:", err);
-          updateStatus("offline", "❌ 儲存至 Google 試算表失敗，但已保存在手機本機");
-        });
-      }, 500);
+        if (res.status === "success") {
+          if (res.mergedData) {
+            members = res.mergedData.members || members;
+            orders = res.mergedData.orders || orders;
+            localStorage.setItem("shaoye_members", JSON.stringify(members));
+            localStorage.setItem("shaoye_orders", JSON.stringify(orders));
+            renderTable();
+            calculateAll();
+          }
+          updateStatus("online", `✅ 已成功送出！(${new Date().toLocaleTimeString()} 已存入試算表)`);
+          alert(`🎉「${currentUser}」的點餐已成功送出並更新至 Google 試算表！`);
+        } else {
+          throw new Error(res.message);
+        }
+      })
+      .catch(err => {
+        isSubmitting = false;
+        btn.disabled = false;
+        btn.innerText = "🚀 送出我的點餐到雲端";
+        console.error("送出失敗:", err);
+        updateStatus("offline", "❌ 送出失敗，資料已安全暫存在手機本機");
+        alert("連線發生問題，請確認網路或稍候再試。本機點單不會遺失！");
+      });
     }
 
     // 渲染表格
@@ -515,10 +624,15 @@
       `;
       members.forEach((m, idx) => {
         const th = document.createElement("th");
-        th.innerHTML = `
-          <span>${escapeHtml(m)}</span>
-          <button class="delete-member-btn" title="刪除" onclick="removeMember(${idx})">✕</button>
-        `;
+        if (m === currentUser) {
+          th.className = "current-user-col";
+          th.innerHTML = `<span>⭐ ${escapeHtml(m)} (我)</span>`;
+        } else {
+          th.innerHTML = `
+            <span>${escapeHtml(m)}</span>
+            <button class="delete-member-btn" title="刪除" onclick="removeMember(${idx})">✕</button>
+          `;
+        }
         headerRow.appendChild(th);
       });
       headerRow.innerHTML += `
@@ -539,8 +653,9 @@
 
         members.forEach(m => {
           const qty = (orders[m] && orders[m][item.id]) ? orders[m][item.id] : 0;
+          const colClass = (m === currentUser) ? "current-user-col" : "";
           cellsHtml += `
-            <td>
+            <td class="${colClass}">
               <div class="qty-control">
                 <button class="qty-btn" onclick="changeQty('${m}', '${item.id}', -1)">-</button>
                 <input type="number" class="qty-input" min="0" max="99" 
@@ -572,7 +687,8 @@
       `;
 
       members.forEach((m, idx) => {
-        footRow.innerHTML += `<td id="member-total-${idx}">$0 (0件)</td>`;
+        const colClass = (m === currentUser) ? "current-user-col" : "";
+        footRow.innerHTML += `<td id="member-total-${idx}" class="${colClass}">$0 (0件)</td>`;
       });
 
       footRow.innerHTML += `
@@ -581,22 +697,34 @@
       `;
     }
 
+    // 本機修改數量
     function changeQty(member, itemId, delta) {
       if (!orders[member]) orders[member] = {};
       let current = orders[member][itemId] || 0;
       orders[member][itemId] = Math.max(0, current + delta);
+      saveLocal();
       renderTable();
       calculateAll();
-      triggerSaveToGoogleDrive();
+      showUnsavedHint();
     }
 
     function setQty(member, itemId, val) {
       if (!orders[member]) orders[member] = {};
       let parsed = parseInt(val, 10);
       orders[member][itemId] = isNaN(parsed) || parsed < 0 ? 0 : parsed;
+      saveLocal();
       renderTable();
       calculateAll();
-      triggerSaveToGoogleDrive();
+      showUnsavedHint();
+    }
+
+    function showUnsavedHint() {
+      updateStatus("syncing", "✏️ 本機已修改，選完請記得點擊上方「送出我的點餐」！");
+    }
+
+    function saveLocal() {
+      localStorage.setItem("shaoye_members", JSON.stringify(members));
+      localStorage.setItem("shaoye_orders", JSON.stringify(orders));
     }
 
     function addMember() {
@@ -606,10 +734,13 @@
       if (members.includes(name)) return alert("已有同名人員！");
       members.push(name);
       orders[name] = {};
+      currentUser = name;
       input.value = "";
+      saveLocal();
+      renderUserSelect();
       renderTable();
       calculateAll();
-      triggerSaveToGoogleDrive();
+      showUnsavedHint();
     }
 
     function removeMember(idx) {
@@ -617,18 +748,29 @@
       if (confirm(`確定移除「${target}」嗎？`)) {
         delete orders[target];
         members.splice(idx, 1);
+        if (currentUser === target) currentUser = members[0] || "";
+        saveLocal();
+        renderUserSelect();
         renderTable();
         calculateAll();
-        triggerSaveToGoogleDrive();
+        showUnsavedHint();
       }
     }
 
     function resetAllOrders() {
-      if (confirm("確定要將所有點餐數量歸零嗎？")) {
+      if (confirm("⚠️ 確定要將全桌的所有點餐數量歸零嗎？")) {
         members.forEach(m => orders[m] = {});
+        saveLocal();
         renderTable();
         calculateAll();
-        triggerSaveToGoogleDrive();
+
+        if (GOOGLE_GAS_API_URL && !GOOGLE_GAS_API_URL.includes("您的部署ID")) {
+          fetch(GOOGLE_GAS_API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({ action: "reset_all", members: members, orders: orders, menuSummary: MENU_DATA })
+          }).then(() => alert("已清空全桌點單並同步至雲端！"));
+        }
       }
     }
 
