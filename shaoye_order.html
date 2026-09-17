@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>燒夜 Hot Night - 多人點餐與費用統計系統</title>
+  <style>
+    :root {
+      --bg-dark: #121418;
+      --card-bg: #1c1f26;
+      --border-color: #2e3440;
+      --accent-orange: #f97316;
+      --accent-red: #ef4444;
+      --accent-yellow: #eab308;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --row-even: #1e222a;
+      --row-hover: #2a303c;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans TC", sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      padding: 20px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* 頂部標題與儀表板 */
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 20px;
+    }
+
+    .brand-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-badge {
+      background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));
+      color: white;
+      font-weight: 800;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 1.3rem;
+      letter-spacing: 1px;
+    }
+
+    .brand-subtitle {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .stats-bar {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .stat-card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      padding: 10px 18px;
+      border-radius: 10px;
+      text-align: right;
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .stat-value {
+      font-size: 1.35rem;
+      font-weight: bold;
+      color: var(--accent-yellow);
+    }
+
+    /* 控制列 */
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      background: var(--card-bg);
+      padding: 12px 18px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+    }
+
+    .member-controls, .action-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    input[type="text"] {
+      background-color: #272c36;
+      border: 1px solid #3f4756;
+      color: white;
+      padding: 7px 12px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent-orange);
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-primary {
+      background-color: var(--accent-orange);
+      color: white;
+    }
+    .btn-primary:hover {
+      background-color: #ea580c;
+    }
+
+    .btn-secondary {
+      background-color: #374151;
+      color: #e5e7eb;
+    }
+    .btn-secondary:hover {
+      background-color: #4b5563;
+    }
+
+    .btn-success {
+      background-color: #10b981;
+      color: white;
+    }
+    .btn-success:hover {
+      background-color: #059669;
+    }
+
+    .btn-danger {
+      background-color: #dc2626;
+      color: white;
+    }
+    .btn-danger:hover {
+      background-color: #b91c1c;
+    }
+
+    /* 表格容器 */
+    .table-container {
+      overflow-x: auto;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      background-color: var(--card-bg);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      max-height: 72vh;
+      position: relative;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: center;
+      font-size: 0.92rem;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border-color);
+      white-space: nowrap;
+    }
+
+    /* 凍結表頭 */
+    thead th {
+      position: sticky;
+      top: 0;
+      background-color: #232833;
+      z-index: 10;
+      color: #e5e7eb;
+      font-weight: 600;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    /* 凍結左側品項資訊欄 */
+    .sticky-col-1 {
+      position: sticky;
+      left: 0;
+      background-color: #1c1f26;
+      z-index: 5;
+      text-align: left;
+      min-width: 120px;
+    }
+
+    .sticky-col-2 {
+      position: sticky;
+      left: 120px;
+      background-color: #1c1f26;
+      z-index: 5;
+      text-align: left;
+      min-width: 160px;
+      font-weight: 600;
+    }
+
+    .sticky-col-3 {
+      position: sticky;
+      left: 280px;
+      background-color: #1c1f26;
+      z-index: 5;
+      min-width: 70px;
+      color: var(--accent-yellow);
+      border-right: 2px solid var(--border-color);
+    }
+
+    thead th.sticky-col-1, thead th.sticky-col-2, thead th.sticky-col-3 {
+      z-index: 15;
+      background-color: #232833;
+    }
+
+    tbody tr:nth-child(even) {
+      background-color: var(--row-even);
+    }
+    tbody tr:nth-child(even) .sticky-col-1,
+    tbody tr:nth-child(even) .sticky-col-2,
+    tbody tr:nth-child(even) .sticky-col-3 {
+      background-color: var(--row-even);
+    }
+
+    tbody tr:hover {
+      background-color: var(--row-hover);
+    }
+    tbody tr:hover .sticky-col-1,
+    tbody tr:hover .sticky-col-2,
+    tbody tr:hover .sticky-col-3 {
+      background-color: var(--row-hover);
+    }
+
+    /* 數量輸入控制元件 */
+    .qty-control {
+      display: inline-flex;
+      align-items: center;
+      background-color: #272c36;
+      border-radius: 6px;
+      border: 1px solid #374151;
+      overflow: hidden;
+    }
+
+    .qty-btn {
+      background: transparent;
+      border: none;
+      color: #9ca3af;
+      padding: 3px 8px;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+    .qty-btn:hover {
+      background-color: #374151;
+      color: white;
+    }
+
+    .qty-input {
+      width: 38px;
+      text-align: center;
+      background: transparent;
+      border: none;
+      color: white;
+      font-size: 0.95rem;
+      font-weight: 600;
+      outline: none;
+      -moz-appearance: textfield;
+    }
+    .qty-input::-webkit-outer-spin-button,
+    .qty-input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    /* 統計列與匯總 */
+    tfoot tr {
+      position: sticky;
+      bottom: 0;
+      background-color: #171a21;
+      font-weight: bold;
+      z-index: 10;
+      box-shadow: 0 -2px 6px rgba(0,0,0,0.4);
+    }
+
+    tfoot td.sticky-col-1, tfoot td.sticky-col-2, tfoot td.sticky-col-3 {
+      background-color: #171a21;
+      z-index: 15;
+    }
+
+    .badge-category {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      background-color: #374151;
+      color: #d1d5db;
+    }
+
+    .col-summary-qty {
+      background-color: rgba(249, 115, 22, 0.1);
+      color: var(--accent-orange);
+      font-weight: bold;
+    }
+
+    .col-summary-amount {
+      background-color: rgba(234, 179, 8, 0.1);
+      color: var(--accent-yellow);
+      font-weight: bold;
+    }
+
+    .delete-member-btn {
+      background: none;
+      color: #9ca3af;
+      font-size: 0.75rem;
+      margin-left: 4px;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+    .delete-member-btn:hover {
+      color: var(--accent-red);
+      background-color: #374151;
+    }
+
+    /* 彈跳視窗 Modal (店家劃單清單 & LINE文字) */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.75);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .modal-content {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      width: 100%;
+      max-width: 650px;
+      max-height: 85vh;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    }
+
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-body {
+      padding: 20px;
+      overflow-y: auto;
+      font-size: 0.95rem;
+    }
+
+    .modal-footer {
+      padding: 14px 20px;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    textarea.summary-text {
+      width: 100%;
+      height: 280px;
+      background-color: #121418;
+      border: 1px solid var(--border-color);
+      color: #e5e7eb;
+      padding: 12px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 0.9rem;
+      resize: vertical;
+    }
+
+    .order-item-chip {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-bottom: 1px solid #282f3d;
+    }
+    .order-item-chip:last-child {
+      border-bottom: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- 頂部資訊列 -->
+    <header>
+      <div class="brand-title">
+        <div class="brand-badge">燒夜</div>
+        <div>
+          <h2>多人點餐與費用統計矩陣</h2>
+          <div class="brand-subtitle">串燒・烤物・炸物・白飯內用續碗</div>
+        </div>
+      </div>
+      <div class="stats-bar">
+        <div class="stat-card">
+          <div class="stat-label">全單總金額</div>
+          <div class="stat-value" id="grand-total-amount">NT$ 0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">已點總數量</div>
+          <div class="stat-value" id="grand-total-qty">0 份/串</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">用餐總人數</div>
+          <div class="stat-value" id="total-members-count">0 人</div>
+        </div>
+      </div>
+    </header>
+
+    <!-- 工具列 -->
+    <div class="toolbar">
+      <div class="member-controls">
+        <input type="text" id="new-member-name" placeholder="輸入同事/朋友姓名..." maxlength="10">
+        <button class="btn-primary" onclick="addMember()">＋ 新增點餐人員</button>
+      </div>
+      <div class="action-controls">
+        <button class="btn-secondary" onclick="openKitchenModal()">📋 店家劃單彙整</button>
+        <button class="btn-success" onclick="openShareModal()">💬 複製 LINE 對帳清單</button>
+        <button class="btn-danger" onclick="resetAllOrders()">🔄 清空所有數量</button>
+      </div>
+    </div>
+
+    <!-- 點餐矩陣表格 -->
+    <div class="table-container">
+      <table id="matrix-table">
+        <thead>
+          <tr id="table-header-row">
+            <th class="sticky-col-1">分類</th>
+            <th class="sticky-col-2">品項名稱</th>
+            <th class="sticky-col-3">單價</th>
+            <!-- 人員動態欄位插入於此 -->
+            <th class="col-summary-qty">店家劃單總量</th>
+            <th class="col-summary-amount">品項小計</th>
+          </tr>
+        </thead>
+        <tbody id="matrix-tbody">
+          <!-- 菜單資料由 JS 動態渲染 -->
+        </tbody>
+        <tfoot>
+          <tr id="table-foot-row">
+            <td class="sticky-col-1">統計</td>
+            <td class="sticky-col-2">個人應付總計</td>
+            <td class="sticky-col-3">-</td>
+            <!-- 人員個別加總金額插入於此 -->
+            <td id="foot-total-qty" class="col-summary-qty">0</td>
+            <td id="foot-total-amount" class="col-summary-amount">NT$ 0</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal 1: 店家出餐彙整表 -->
+  <div class="modal-overlay" id="kitchen-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>📋 店家劃單彙整清單 (僅顯示點餐項)</h3>
+        <button class="btn-secondary" onclick="closeModal('kitchen-modal')">✕</button>
+      </div>
+      <div class="modal-body" id="kitchen-list-body">
+        <!-- 動態產生 -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn-primary" onclick="closeModal('kitchen-modal')">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: LINE 分帳文字分享 -->
+  <div class="modal-overlay" id="share-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>💬 LINE 對帳明細訊息</h3>
+        <button class="btn-secondary" onclick="closeModal('share-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <textarea id="share-text-area" class="summary-text" readonly></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-success" onclick="copyShareText()">📋 複製到剪貼簿</button>
+        <button class="btn-secondary" onclick="closeModal('share-modal')">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 菜單完整資料庫（根據菜單圖片建檔）
+    const MENU_DATA = [
+      // 鹽烤串燒
+      { id: "A01", category: "鹽烤串燒", name: "牛肋串 (鹽烤)", price: 50, unit: "串" },
+      { id: "A02", category: "鹽烤串燒", name: "翼板牛肉串 (鹽烤)", price: 56, unit: "串" },
+      { id: "A03", category: "鹽烤串燒", name: "梅花豚肉串 (鹽烤)", price: 33, unit: "串" },
+      { id: "A04", category: "鹽烤串燒", name: "五花豚肉串 (鹽烤)", price: 33, unit: "串" },
+      { id: "A05", category: "鹽烤串燒", name: "雞腿串 (鹽烤)", price: 35, unit: "串" },
+      { id: "A06", category: "鹽烤串燒", name: "雞肉串 (鹽烤)", price: 29, unit: "串" },
+
+      // 醬烤串燒 - 牛肉
+      { id: "B01", category: "醬烤串燒-牛", name: "青蔥小肥牛", price: 50, unit: "串" },
+      { id: "B02", category: "醬烤串燒-牛", name: "牛肋串 (醬烤)", price: 50, unit: "串" },
+      { id: "B03", category: "醬烤串燒-牛", name: "翼板牛肉串 (醬烤)", price: 56, unit: "串" },
+
+      // 醬烤串燒 - 豬肉
+      { id: "B04", category: "醬烤串燒-豬", name: "青蔥豚肉串", price: 45, unit: "串" },
+      { id: "B05", category: "醬烤串燒-豬", name: "五花豚肉串 (醬烤)", price: 33, unit: "串" },
+      { id: "B06", category: "醬烤串燒-豬", name: "梅花豚肉串 (醬烤)", price: 33, unit: "串" },
+      { id: "B07", category: "醬烤串燒-豬", name: "珍珠香腸", price: 39, unit: "串" },
+      { id: "B08", category: "醬烤串燒-豬", name: "貢丸", price: 39, unit: "串" },
+
+      // 醬烤串燒 - 雞肉
+      { id: "B09", category: "醬烤串燒-雞", name: "雞翅", price: 48, unit: "串" },
+      { id: "B10", category: "醬烤串燒-雞", name: "雞腿串 (醬烤)", price: 35, unit: "串" },
+      { id: "B11", category: "醬烤串燒-雞", name: "雞肉串 (醬烤)", price: 29, unit: "串" },
+      { id: "B12", category: "醬烤串燒-雞", name: "雞尾椎", price: 37, unit: "串" },
+      { id: "B13", category: "醬烤串燒-雞", name: "雞心", price: 27, unit: "串" },
+      { id: "B14", category: "醬烤串燒-雞", name: "雞皮", price: 30, unit: "串" },
+
+      // 醬烤串燒 - 蔬菜
+      { id: "B15", category: "醬烤串燒-蔬菜", name: "花菜", price: 22, unit: "串" },
+      { id: "B16", category: "醬烤串燒-蔬菜", name: "杏鮑菇", price: 22, unit: "串" },
+      { id: "B17", category: "醬烤串燒-蔬菜", name: "櫛瓜", price: 26, unit: "串" },
+      { id: "B18", category: "醬烤串燒-蔬菜", name: "小黃瓜", price: 22, unit: "串" },
+      { id: "B19", category: "醬烤串燒-蔬菜", name: "青椒", price: 22, unit: "串" },
+      { id: "B20", category: "醬烤串燒-蔬菜", name: "香菇", price: 40, unit: "串" },
+
+      // 醬烤串燒 - 其他
+      { id: "B21", category: "醬烤串燒-其他", name: "甜不辣", price: 29, unit: "串" },
+      { id: "B22", category: "醬烤串燒-其他", name: "豆干", price: 29, unit: "串" },
+      { id: "B23", category: "醬烤串燒-其他", name: "百頁豆腐", price: 27, unit: "串" },
+      { id: "B24", category: "醬烤串燒-其他", name: "米血糕", price: 27, unit: "串" },
+      { id: "B25", category: "醬烤串燒-其他", name: "豆皮", price: 27, unit: "串" },
+      { id: "B26", category: "醬烤串燒-其他", name: "米腸", price: 37, unit: "串" },
+      { id: "B27", category: "醬烤串燒-其他", name: "黑輪", price: 23, unit: "串" },
+
+      // 炸物 & 小菜
+      { id: "C01", category: "炸物&小菜", name: "美式脆薯", price: 65, unit: "份" },
+      { id: "C02", category: "炸物&小菜", name: "麥克雞塊", price: 65, unit: "份" },
+      { id: "C03", category: "炸物&小菜", name: "香酥雞球", price: 65, unit: "份" },
+      { id: "C04", category: "炸物&小菜", name: "炸烤餃子", price: 35, unit: "份" },
+      { id: "C05", category: "炸物&小菜", name: "燒夜泡菜", price: 60, unit: "份" },
+      { id: "C06", category: "炸物&小菜", name: "煉乳銀絲卷", price: 60, unit: "份" },
+      { id: "C07", category: "炸物&小菜", name: "白飯 (內用續)", price: 20, unit: "份" },
+
+      // 燒烤單點
+      { id: "D01", category: "燒烤單點", name: "炙燒霜降牛", price: 140, unit: "份" },
+      { id: "D02", category: "燒烤單點", name: "醬烤魷魚", price: 150, unit: "尾" },
+      { id: "D03", category: "燒烤單點", name: "鹽烤松阪豬", price: 250, unit: "份" },
+      { id: "D04", category: "燒烤單點", name: "鹽烤鯖魚", price: 150, unit: "尾" },
+      { id: "D05", category: "燒烤單點", name: "鹽烤白蝦", price: 100, unit: "份" },
+      { id: "D06", category: "燒烤單點", name: "鹽烤秋刀魚", price: 100, unit: "尾" },
+      { id: "D07", category: "燒烤單點", name: "醬烤玉米筍", price: 70, unit: "份" },
+      { id: "D08", category: "燒烤單點", name: "醬烤四季豆", price: 60, unit: "份" }
+    ];
+
+    // 人員清單 (支援 LocalStorage 紀錄)
+    let members = JSON.parse(localStorage.getItem("shaoye_members")) || ["小明", "小美", "阿華"];
+    // 訂單矩陣資料：orders[member][itemId] = qty
+    let orders = JSON.parse(localStorage.getItem("shaoye_orders")) || {};
+
+    // 初始化
+    function init() {
+      // 確保 orders 結構完整
+      members.forEach(m => {
+        if (!orders[m]) orders[m] = {};
+      });
+      renderTable();
+      calculateAll();
+    }
+
+    // 儲存到 LocalStorage
+    function saveData() {
+      localStorage.setItem("shaoye_members", JSON.stringify(members));
+      localStorage.setItem("shaoye_orders", JSON.stringify(orders));
+    }
+
+    // 渲染整個表格
+    function renderTable() {
+      // 1. 渲染 Header
+      const headerRow = document.getElementById("table-header-row");
+      headerRow.innerHTML = `
+        <th class="sticky-col-1">分類</th>
+        <th class="sticky-col-2">品項名稱</th>
+        <th class="sticky-col-3">單價</th>
+      `;
+      members.forEach((m, idx) => {
+        const th = document.createElement("th");
+        th.innerHTML = `
+          <span>${escapeHtml(m)}</span>
+          <button class="delete-member-btn" title="刪除此人" onclick="removeMember(${idx})">✕</button>
+        `;
+        headerRow.appendChild(th);
+      });
+      headerRow.innerHTML += `
+        <th class="col-summary-qty">店家總量</th>
+        <th class="col-summary-amount">品項小計</th>
+      `;
+
+      // 2. 渲染 Body
+      const tbody = document.getElementById("matrix-tbody");
+      tbody.innerHTML = "";
+
+      MENU_DATA.forEach(item => {
+        const tr = document.createElement("tr");
+        tr.dataset.itemId = item.id;
+
+        let cellsHtml = `
+          <td class="sticky-col-1"><span class="badge-category">${item.category}</span></td>
+          <td class="sticky-col-2">${item.name}</td>
+          <td class="sticky-col-3">$${item.price}</td>
+        `;
+
+        // 每個人員的數量控制欄位
+        members.forEach(m => {
+          const qty = (orders[m] && orders[m][item.id]) ? orders[m][item.id] : 0;
+          cellsHtml += `
+            <td>
+              <div class="qty-control">
+                <button class="qty-btn" onclick="changeQty('${m}', '${item.id}', -1)">-</button>
+                <input type="number" class="qty-input" min="0" max="99" 
+                       value="${qty}" 
+                       onchange="setQty('${m}', '${item.id}', this.value)" />
+                <button class="qty-btn" onclick="changeQty('${m}', '${item.id}', 1)">+</button>
+              </div>
+            </td>
+          `;
+        });
+
+        // 該列加總
+        cellsHtml += `
+          <td class="col-summary-qty" id="row-qty-${item.id}">0</td>
+          <td class="col-summary-amount" id="row-amount-${item.id}">NT$ 0</td>
+        `;
+
+        tr.innerHTML = cellsHtml;
+        tbody.appendChild(tr);
+      });
+
+      // 3. 渲染 Footer
+      renderFooter();
+    }
+
+    function renderFooter() {
+      const footRow = document.getElementById("table-foot-row");
+      footRow.innerHTML = `
+        <td class="sticky-col-1">統計</td>
+        <td class="sticky-col-2">個人應付總計</td>
+        <td class="sticky-col-3">-</td>
+      `;
+
+      members.forEach((m, idx) => {
+        footRow.innerHTML += `<td id="member-total-${idx}">$0 (0件)</td>`;
+      });
+
+      footRow.innerHTML += `
+        <td id="foot-total-qty" class="col-summary-qty">0</td>
+        <td id="foot-total-amount" class="col-summary-amount">NT$ 0</td>
+      `;
+    }
+
+    // 數量修改事件
+    function changeQty(member, itemId, delta) {
+      if (!orders[member]) orders[member] = {};
+      let current = orders[member][itemId] || 0;
+      let updated = Math.max(0, current + delta);
+      orders[member][itemId] = updated;
+      saveData();
+      renderTable();
+      calculateAll();
+    }
+
+    function setQty(member, itemId, val) {
+      if (!orders[member]) orders[member] = {};
+      let parsed = parseInt(val, 10);
+      if (isNaN(parsed) || parsed < 0) parsed = 0;
+      orders[member][itemId] = parsed;
+      saveData();
+      renderTable();
+      calculateAll();
+    }
+
+    // 新增人員
+    function addMember() {
+      const input = document.getElementById("new-member-name");
+      const name = input.value.trim();
+      if (!name) {
+        alert("請輸入人員姓名！");
+        return;
+      }
+      if (members.includes(name)) {
+        alert("已有同名人員，請使用不同暱稱區分！");
+        return;
+      }
+      members.push(name);
+      orders[name] = {};
+      input.value = "";
+      saveData();
+      renderTable();
+      calculateAll();
+    }
+
+    // 移除人員
+    function removeMember(idx) {
+      const target = members[idx];
+      if (confirm(`確定要移除「${target}」的點單紀錄嗎？`)) {
+        delete orders[target];
+        members.splice(idx, 1);
+        saveData();
+        renderTable();
+        calculateAll();
+      }
+    }
+
+    // 清空所有訂單
+    function resetAllOrders() {
+      if (confirm("確定要清空所有人的點餐數量嗎？人員清單將會保留。")) {
+        members.forEach(m => orders[m] = {});
+        saveData();
+        renderTable();
+        calculateAll();
+      }
+    }
+
+    // 即時計算全體金額與數量
+    function calculateAll() {
+      let grandTotalQty = 0;
+      let grandTotalAmount = 0;
+
+      // 1. 計算每列品項總和
+      MENU_DATA.forEach(item => {
+        let rowQty = 0;
+        members.forEach(m => {
+          if (orders[m] && orders[m][item.id]) {
+            rowQty += orders[m][item.id];
+          }
+        });
+        let rowAmount = rowQty * item.price;
+        grandTotalQty += rowQty;
+        grandTotalAmount += rowAmount;
+
+        const cellQty = document.getElementById(`row-qty-${item.id}`);
+        const cellAmount = document.getElementById(`row-amount-${item.id}`);
+        if (cellQty) cellQty.innerText = rowQty;
+        if (cellAmount) cellAmount.innerText = `NT$ ${rowAmount.toLocaleString()}`;
+      });
+
+      // 2. 計算每個人員的金額總計
+      members.forEach((m, idx) => {
+        let mQty = 0;
+        let mAmount = 0;
+        MENU_DATA.forEach(item => {
+          const qty = (orders[m] && orders[m][item.id]) ? orders[m][item.id] : 0;
+          mQty += qty;
+          mAmount += qty * item.price;
+        });
+
+        const cell = document.getElementById(`member-total-${idx}`);
+        if (cell) {
+          cell.innerHTML = `<strong>NT$ ${mAmount.toLocaleString()}</strong><br><span style="font-size:0.75rem; color:#9ca3af;">(${mQty}件)</span>`;
+        }
+      });
+
+      // 3. 底部與頂部總結算
+      document.getElementById("grand-total-amount").innerText = `NT$ ${grandTotalAmount.toLocaleString()}`;
+      document.getElementById("grand-total-qty").innerText = `${grandTotalQty} 份/串`;
+      document.getElementById("total-members-count").innerText = `${members.length} 人`;
+
+      const footQty = document.getElementById("foot-total-qty");
+      const footAmount = document.getElementById("foot-total-amount");
+      if (footQty) footQty.innerText = grandTotalQty;
+      if (footAmount) footAmount.innerText = `NT$ ${grandTotalAmount.toLocaleString()}`;
+    }
+
+    // Modal: 店家劃單清單
+    function openKitchenModal() {
+      const container = document.getElementById("kitchen-list-body");
+      container.innerHTML = "";
+
+      let hasItems = false;
+      let currentCategory = "";
+
+      MENU_DATA.forEach(item => {
+        let totalQty = 0;
+        members.forEach(m => {
+          if (orders[m] && orders[m][item.id]) {
+            totalQty += orders[m][item.id];
+          }
+        });
+
+        if (totalQty > 0) {
+          hasItems = true;
+          if (item.category !== currentCategory) {
+            currentCategory = item.category;
+            const catHeader = document.createElement("div");
+            catHeader.style.cssText = "font-weight:bold; color:var(--accent-orange); margin-top:12px; margin-bottom:6px; border-bottom:1px solid #374151; padding-bottom:4px;";
+            catHeader.innerText = `【${currentCategory}】`;
+            container.appendChild(catHeader);
+          }
+
+          const chip = document.createElement("div");
+          chip.className = "order-item-chip";
+          chip.innerHTML = `
+            <span>${item.name} ($${item.price}/${item.unit})</span>
+            <span style="font-weight:bold; font-size:1.1rem; color:var(--accent-yellow);">${totalQty} ${item.unit}</span>
+          `;
+          container.appendChild(chip);
+        }
+      });
+
+      if (!hasItems) {
+        container.innerHTML = `<div style="text-align:center; color:#9ca3af; padding:30px;">目前尚未點選任何品項！</div>`;
+      }
+
+      document.getElementById("kitchen-modal").style.display = "flex";
+    }
+
+    // Modal: LINE 分帳文字產生器
+    function openShareModal() {
+      let text = "🍢【燒夜 Hot Night 點餐明細與收款分攤】🍢\n";
+      text += "---------------------------------\n";
+
+      let grandTotal = 0;
+      let totalQty = 0;
+
+      members.forEach(m => {
+        let mTotal = 0;
+        let mCount = 0;
+        let detailList = [];
+
+        MENU_DATA.forEach(item => {
+          const qty = (orders[m] && orders[m][item.id]) ? orders[m][item.id] : 0;
+          if (qty > 0) {
+            mTotal += qty * item.price;
+            mCount += qty;
+            detailList.push(`${item.name} x${qty}`);
+          }
+        });
+
+        grandTotal += mTotal;
+        totalQty += mCount;
+
+        text += `👤 ${m}：應付 NT$ ${mTotal} (${mCount}項)\n`;
+        if (detailList.length > 0) {
+          text += `   明細：${detailList.join("、")}\n`;
+        } else {
+          text += `   明細：(無點餐)\n`;
+        }
+        text += "\n";
+      });
+
+      text += "---------------------------------\n";
+      text += `💰 全桌總金額：NT$ ${grandTotal}\n`;
+      text += `🍢 總數量：${totalQty} 份/串\n`;
+      text += `📅 統計時間：${new Date().toLocaleString("zh-TW", {hour12: false})}\n`;
+
+      document.getElementById("share-text-area").value = text;
+      document.getElementById("share-modal").style.display = "flex";
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).style.display = "none";
+    }
+
+    function copyShareText() {
+      const textarea = document.getElementById("share-text-area");
+      textarea.select();
+      navigator.clipboard.writeText(textarea.value).then(() => {
+        alert("已成功複製對帳清單至剪貼簿！可直接貼至 LINE 群組。");
+      });
+    }
+
+    function escapeHtml(string) {
+      return String(string).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // 啟動
+    window.onload = init;
+  </script>
+</body>
+</html>
