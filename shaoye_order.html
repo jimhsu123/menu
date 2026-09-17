@@ -32,7 +32,6 @@
 
     .container { max-width: 1400px; margin: 0 auto; }
 
-    /* 頂部送出與同步操作列 */
     .submit-panel {
       background: linear-gradient(135deg, #1e2638, #182030);
       border: 1px solid var(--accent-blue);
@@ -118,7 +117,6 @@
 
     @keyframes pulse { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
 
-    /* 頂部統計列 */
     header {
       display: flex;
       flex-wrap: wrap;
@@ -152,7 +150,6 @@
     .stat-label { font-size: 0.75rem; color: var(--text-muted); }
     .stat-value { font-size: 1.25rem; font-weight: bold; color: var(--accent-yellow); }
 
-    /* 工具列 */
     .toolbar {
       display: flex;
       flex-wrap: wrap;
@@ -203,7 +200,6 @@
     .btn-success { background-color: var(--accent-green); color: white; }
     .btn-danger { background-color: var(--accent-red); color: white; }
 
-    /* 表格設計與凍結窗格 */
     .table-container {
       overflow-x: auto;
       border-radius: 10px;
@@ -283,7 +279,6 @@
     .delete-member-btn { background: none; color: #9ca3af; font-size: 0.75rem; margin-left: 4px; }
     .delete-member-btn:hover { color: var(--accent-red); }
 
-    /* Modal 彈跳視窗 */
     .modal-overlay {
       display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
       background: rgba(0, 0, 0, 0.75); z-index: 100;
@@ -308,13 +303,10 @@
 <body>
 
   <div class="container">
-    <!-- 批次送出操作面板 -->
     <div class="submit-panel">
       <div class="submit-left">
         <span class="submit-badge">點餐身分</span>
-        <select id="current-user-select" class="select-member" onchange="switchCurrentUser()">
-          <!-- 動態填入成員 -->
-        </select>
+        <select id="current-user-select" class="select-member" onchange="switchCurrentUser()"></select>
         <button class="btn-submit-main" id="btn-submit-order" onclick="submitMyOrderToCloud()">
           🚀 送出我的點餐到雲端
         </button>
@@ -329,7 +321,6 @@
       </div>
     </div>
 
-    <!-- 頂部資訊列 -->
     <header>
       <div class="brand-title">
         <div class="brand-badge">燒夜</div>
@@ -354,7 +345,6 @@
       </div>
     </header>
 
-    <!-- 工具列 -->
     <div class="toolbar">
       <div class="member-controls">
         <input type="text" id="new-member-name" placeholder="新增人員姓名..." maxlength="10">
@@ -367,7 +357,6 @@
       </div>
     </div>
 
-    <!-- 點餐矩陣表格 -->
     <div class="table-container">
       <table id="matrix-table">
         <thead>
@@ -375,7 +364,6 @@
             <th class="sticky-col-1">分類</th>
             <th class="sticky-col-2">品項名稱</th>
             <th class="sticky-col-3">單價</th>
-            <!-- 動態人員 -->
             <th class="col-summary-qty">店家劃單總量</th>
             <th class="col-summary-amount">品項小計</th>
           </tr>
@@ -386,7 +374,6 @@
             <td class="sticky-col-1">統計</td>
             <td class="sticky-col-2">個人應付總計</td>
             <td class="sticky-col-3">-</td>
-            <!-- 人員總額 -->
             <td id="foot-total-qty" class="col-summary-qty">0</td>
             <td id="foot-total-amount" class="col-summary-amount">NT$ 0</td>
           </tr>
@@ -395,7 +382,6 @@
     </div>
   </div>
 
-  <!-- Modal 1: 店家劃單彙整 -->
   <div class="modal-overlay" id="kitchen-modal">
     <div class="modal-content">
       <div class="modal-header">
@@ -409,7 +395,6 @@
     </div>
   </div>
 
-  <!-- Modal 2: LINE 分帳文字 -->
   <div class="modal-overlay" id="share-modal">
     <div class="modal-content">
       <div class="modal-header">
@@ -427,13 +412,11 @@
   </div>
 
   <script>
-    // ==========================================
-    // ⚠️ 請填入您的 Google Apps Script Web App 網址 ⚠️
-    // ==========================================
-    const GOOGLE_GAS_API_URL = "https://script.google.com/macros/s/AKfycbwFvuEqvZ7Y3cc2jykLv47ReiadY4tQoTVzvkzCbyzpKV2ITaRn-voo1lR4AXZh4bcAUg/exec
-";
+    // ==============================================================
+    // ⚠️ 請在此填入您的 Google Apps Script 網址 (結尾必須是 /exec)
+    // ==============================================================
+    const GOOGLE_GAS_API_URL = "https://script.google.com/macros/s/AKfycbwFvuEqvZ7Y3cc2jykLv47ReiadY4tQoTVzvkzCbyzpKV2ITaRn-voo1lR4AXZh4bcAUg/exec";
 
-    // 48 項完整菜單
     const MENU_DATA = [
       { id: "A01", category: "鹽烤串燒", name: "牛肋串 (鹽烤)", price: 50, unit: "串" },
       { id: "A02", category: "鹽烤串燒", name: "翼板牛肉串 (鹽烤)", price: 56, unit: "串" },
@@ -495,11 +478,10 @@
       renderTable();
       calculateAll();
 
-      // 開啟時只從 Google 試算表拉取一次最新點餐
       if (GOOGLE_GAS_API_URL && !GOOGLE_GAS_API_URL.includes("您的部署ID")) {
         fetchFromGoogleDrive(false);
       } else {
-        updateStatus("offline", "⚠️ 未填入 Google 網址，目前為單機 LocalStorage 模式");
+        updateStatus("offline", "⚠️ 未填入 Google 網址，目前為單機暫存模式");
       }
     }
 
@@ -532,36 +514,44 @@
       calculateAll();
     }
 
-    // 從 Google Drive 試算表取得全單
     function fetchFromGoogleDrive(isManual = false) {
       if (isSubmitting) return;
       updateStatus("syncing", isManual ? "🔄 正在從 Google 試算表拉取最新點單..." : "連線中...");
 
-      fetch(GOOGLE_GAS_API_URL)
-        .then(res => res.json())
-        .then(res => {
-          if (res.status === "success" && res.data) {
-            members = res.data.members || members;
-            orders = res.data.orders || orders;
-            localStorage.setItem("shaoye_members", JSON.stringify(members));
-            localStorage.setItem("shaoye_orders", JSON.stringify(orders));
-            renderUserSelect();
-            renderTable();
-            calculateAll();
-            updateStatus("online", `🟢 已同步至最新資料 (${new Date().toLocaleTimeString()})`);
-          }
-        })
-        .catch(err => {
-          console.warn("拉取失敗:", err);
-          updateStatus("offline", "⚠️ 無法連線至 Google 試算表，維持本機資料");
-        });
+      // 加上 redirect: follow 支援 GAS 的 302 跳轉
+      fetch(GOOGLE_GAS_API_URL, {
+        method: "GET",
+        mode: "cors",
+        redirect: "follow"
+      })
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP 錯誤：${res.status}`);
+        return res.json();
+      })
+      .then(res => {
+        if (res.status === "success" && res.data) {
+          members = res.data.members || members;
+          orders = res.data.orders || orders;
+          localStorage.setItem("shaoye_members", JSON.stringify(members));
+          localStorage.setItem("shaoye_orders", JSON.stringify(orders));
+          renderUserSelect();
+          renderTable();
+          calculateAll();
+          updateStatus("online", `🟢 已同步至最新資料 (${new Date().toLocaleTimeString()})`);
+        } else {
+          throw new Error(res.message || "回傳格式錯誤");
+        }
+      })
+      .catch(err => {
+        console.warn("拉取失敗:", err);
+        updateStatus("offline", "⚠️ 無法連線至 Google 試算表 (請確認 GAS 是否公開權限)");
+      });
     }
 
-    // 核心功能：一次選完畢，點擊按鈕送出
     function submitMyOrderToCloud() {
-      if (!currentUser) return alert("請先選擇或新增您的姓名！");
+      if (!currentUser) return alert("請先選擇您的姓名！");
       if (!GOOGLE_GAS_API_URL || GOOGLE_GAS_API_URL.includes("您的部署ID")) {
-        return alert("請先在 HTML 內設定您的 Google Apps Script 網址！");
+        return alert("請先在程式碼中的 GOOGLE_GAS_API_URL 填入您的 Google Apps Script 部署網址！");
       }
 
       const btn = document.getElementById("btn-submit-order");
@@ -578,12 +568,18 @@
         menuSummary: MENU_DATA
       };
 
+      // 使用 text/plain 避免觸發 OPTIONS Preflight 阻擋
       fetch(GOOGLE_GAS_API_URL, {
         method: "POST",
+        mode: "cors",
+        redirect: "follow",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(payload)
       })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP 狀態碼：${res.status}`);
+        return res.json();
+      })
       .then(res => {
         isSubmitting = false;
         btn.disabled = false;
@@ -599,7 +595,7 @@
             calculateAll();
           }
           updateStatus("online", `✅ 已成功送出！(${new Date().toLocaleTimeString()} 已存入試算表)`);
-          alert(`🎉「${currentUser}」的點餐已成功送出並更新至 Google 試算表！`);
+          alert(`🎉「${currentUser}」的點餐已成功更新至 Google 試算表！`);
         } else {
           throw new Error(res.message);
         }
@@ -608,13 +604,12 @@
         isSubmitting = false;
         btn.disabled = false;
         btn.innerText = "🚀 送出我的點餐到雲端";
-        console.error("送出失敗:", err);
+        console.error("送出失敗詳細資訊:", err);
         updateStatus("offline", "❌ 送出失敗，資料已安全暫存在手機本機");
-        alert("連線發生問題，請確認網路或稍候再試。本機點單不會遺失！");
+        alert(`連線至 Google 失敗！\n錯誤原因：${err.message}\n\n請檢查：\n1. Google Apps Script 的「誰可以存取」是否已改為「所有人」\n2. 網址結尾是否為 /exec`);
       });
     }
 
-    // 渲染表格
     function renderTable() {
       const headerRow = document.getElementById("table-header-row");
       headerRow.innerHTML = `
@@ -697,7 +692,6 @@
       `;
     }
 
-    // 本機修改數量
     function changeQty(member, itemId, delta) {
       if (!orders[member]) orders[member] = {};
       let current = orders[member][itemId] || 0;
@@ -767,6 +761,8 @@
         if (GOOGLE_GAS_API_URL && !GOOGLE_GAS_API_URL.includes("您的部署ID")) {
           fetch(GOOGLE_GAS_API_URL, {
             method: "POST",
+            mode: "cors",
+            redirect: "follow",
             headers: { "Content-Type": "text/plain;charset=utf-8" },
             body: JSON.stringify({ action: "reset_all", members: members, orders: orders, menuSummary: MENU_DATA })
           }).then(() => alert("已清空全桌點單並同步至雲端！"));
