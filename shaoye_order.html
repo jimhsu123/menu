@@ -231,7 +231,7 @@
       box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
 
-    /* 桌面版寬度與定位 */
+    /* 桌面版欄位寬度與凍結定位 */
     .sticky-col-1 {
       position: sticky;
       left: 0;
@@ -517,8 +517,7 @@
     // ==============================================================
     // ⚠️ 請在此填入您的 Google Apps Script 網址 (結尾必須是 /exec)
     // ==============================================================
-    const GOOGLE_GAS_API_URL = "https://script.google.com/macros/s/AKfycbwFvuEqvZ7Y3cc2jykLv47ReiadY4tQoTVzvkzCbyzpKV2ITaRn-voo1lR4AXZh4bcAUg/exec
-";
+    const GOOGLE_GAS_API_URL = "https://script.google.com/macros/s/AKfycbwFvuEqvZ7Y3cc2jykLv47ReiadY4tQoTVzvkzCbyzpKV2ITaRn-voo1lR4AXZh4bcAUg/exec";
 
     const MENU_DATA = [
       { id: "A01", category: "鹽烤串燒", name: "牛肋串 (鹽烤)", price: 50, unit: "串" },
@@ -712,7 +711,7 @@
     }
 
     function renderTable() {
-      // 1. 渲染表頭 (注意：分類欄包含 col-category 類別)
+      // 1. 渲染表頭 (分類欄包含 col-category 類別，供手機 RWD 隱藏)
       const headerRow = document.getElementById("table-header-row");
       headerRow.innerHTML = `
         <th class="sticky-col-1 col-category">分類</th>
@@ -978,6 +977,7 @@
     }
 
     function closeModal(id) { document.getElementById(id).style.display = "none"; }
+    
     function copyShareText() {
       const textarea = document.getElementById("share-text-area");
       textarea.select();
@@ -985,6 +985,7 @@
         alert("已複製 LINE 對帳明細！");
       });
     }
+
     function escapeHtml(string) {
       return String(string).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
