@@ -263,16 +263,10 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
 // ======== CONFIGURATION (請在下方修改設定) =======
 // ===============================================
 // 1. Google Apps Script 部署網址 (/exec)
-// 這是經過 Base64 編碼後的字串，肉眼直接看或 Ctrl+F 搜尋 "script.google" 會找不到
-const _encodedUrl = "aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3Mvcy9BS2Z5Y2J6OGdZTWVHM1cxaF9HNEhyTjdiZEdFZXk3NHE3cG5rSEZjQUdCWWdEVWpSS1UzQ3c2U2U4cGtISHpxdTdxQlRSME51Zy9leGVj"; 
-
-// 執行時才在記憶體中解碼並還原網址
-console.log(GOOGLE_GAS_API_URL); // 輸出還原後的完整 GAS 網址
-const GOOGLE_GAS_API_URL = atob(_encodedUrl); 
-
+const GOOGLE_GAS_API_URL = "https://script.google.com/macros/s/AKfycbz8gYMeG3W1h_G4HrN7bdGEey74q7pnkHFcAGBYgDUjRKU3Cw6Se8pKIHzqu7qBTR0Nug/exec"; 
 
 // 2. 共享驗證金鑰 (必須與後端 Code.gs 中設定的 API_TOKEN 完全一致)
-const API_TOKEN = "MySuP3rS3cR3tT0kEn20260918!"; 
+const API_TOKEN = "MySuP3rS3cR3tT0kEn2024!"; 
 
 // ===============================================
 // ======== MENU DATA (菜單資料庫) =================
