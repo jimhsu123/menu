@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>燒夜 Hot Night - 多人點餐 (批次送出同步版)</title>
+  <title>燒夜 Hot Night - 多人點餐系統</title>
   <style>
     :root {
       --bg-dark: #121418;
@@ -26,7 +26,7 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans TC", sans-serif;
       background-color: var(--bg-dark);
       color: var(--text-main);
-      padding: 16px;
+      padding: 12px;
       line-height: 1.5;
     }
 
@@ -36,8 +36,8 @@
       background: linear-gradient(135deg, #1e2638, #182030);
       border: 1px solid var(--accent-blue);
       border-radius: 12px;
-      padding: 14px 20px;
-      margin-bottom: 16px;
+      padding: 12px 16px;
+      margin-bottom: 14px;
       display: flex;
       flex-wrap: wrap;
       justify-content: space-between;
@@ -49,7 +49,7 @@
     .submit-left {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       flex-wrap: wrap;
     }
 
@@ -66,9 +66,10 @@
       background-color: #272c36;
       border: 1px solid #4b5563;
       color: white;
-      padding: 8px 12px;
+      padding: 7px 12px;
       border-radius: 6px;
       font-size: 0.95rem;
+      font-weight: 600;
       outline: none;
       cursor: pointer;
     }
@@ -76,9 +77,9 @@
     .btn-submit-main {
       background: linear-gradient(135deg, #10b981, #059669);
       color: white;
-      font-size: 1rem;
+      font-size: 0.95rem;
       font-weight: bold;
-      padding: 9px 20px;
+      padding: 8px 18px;
       border-radius: 8px;
       box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
       cursor: pointer;
@@ -99,7 +100,7 @@
     }
 
     .sync-status-indicator {
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       color: var(--text-muted);
       display: flex;
       align-items: center;
@@ -111,6 +112,7 @@
       height: 10px;
       border-radius: 50%;
       background-color: var(--accent-green);
+      flex-shrink: 0;
     }
     .status-dot.syncing { background-color: var(--accent-yellow); animation: pulse 1s infinite; }
     .status-dot.offline { background-color: var(--accent-red); }
@@ -122,43 +124,43 @@
       flex-wrap: wrap;
       justify-content: space-between;
       align-items: center;
-      gap: 16px;
-      padding-bottom: 16px;
+      gap: 12px;
+      padding-bottom: 12px;
       border-bottom: 1px solid var(--border-color);
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
 
-    .brand-title { display: flex; align-items: center; gap: 12px; }
+    .brand-title { display: flex; align-items: center; gap: 10px; }
     .brand-badge {
       background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));
       color: white;
       font-weight: 800;
-      padding: 6px 14px;
+      padding: 5px 12px;
       border-radius: 8px;
-      font-size: 1.3rem;
+      font-size: 1.2rem;
     }
-    .brand-subtitle { color: var(--text-muted); font-size: 0.85rem; }
+    .brand-subtitle { color: var(--text-muted); font-size: 0.82rem; }
 
-    .stats-bar { display: flex; gap: 12px; flex-wrap: wrap; }
+    .stats-bar { display: flex; gap: 10px; flex-wrap: wrap; }
     .stat-card {
       background-color: var(--card-bg);
       border: 1px solid var(--border-color);
-      padding: 8px 16px;
+      padding: 6px 14px;
       border-radius: 8px;
       text-align: right;
     }
-    .stat-label { font-size: 0.75rem; color: var(--text-muted); }
-    .stat-value { font-size: 1.25rem; font-weight: bold; color: var(--accent-yellow); }
+    .stat-label { font-size: 0.72rem; color: var(--text-muted); }
+    .stat-value { font-size: 1.15rem; font-weight: bold; color: var(--accent-yellow); }
 
     .toolbar {
       display: flex;
       flex-wrap: wrap;
       justify-content: space-between;
       align-items: center;
-      gap: 12px;
-      margin-bottom: 16px;
+      gap: 10px;
+      margin-bottom: 14px;
       background: var(--card-bg);
-      padding: 12px 16px;
+      padding: 10px 14px;
       border-radius: 10px;
       border: 1px solid var(--border-color);
     }
@@ -174,9 +176,9 @@
       background-color: #272c36;
       border: 1px solid #3f4756;
       color: white;
-      padding: 7px 12px;
+      padding: 6px 10px;
       border-radius: 6px;
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       outline: none;
     }
 
@@ -184,13 +186,13 @@
       cursor: pointer;
       border: none;
       border-radius: 6px;
-      padding: 8px 13px;
-      font-size: 0.88rem;
+      padding: 7px 12px;
+      font-size: 0.85rem;
       font-weight: 600;
       transition: all 0.2s ease;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
     }
 
     .btn-primary { background-color: var(--accent-orange); color: white; }
@@ -198,7 +200,15 @@
     .btn-secondary { background-color: #374151; color: #e5e7eb; }
     .btn-secondary:hover { background-color: #4b5563; }
     .btn-success { background-color: var(--accent-green); color: white; }
-    .btn-danger { background-color: var(--accent-red); color: white; }
+    .btn-danger-outline {
+      background-color: transparent;
+      border: 1px solid var(--accent-red);
+      color: #f87171;
+    }
+    .btn-danger-outline:hover {
+      background-color: var(--accent-red);
+      color: white;
+    }
 
     .table-container {
       overflow-x: auto;
@@ -210,7 +220,7 @@
       position: relative;
     }
 
-    table { width: 100%; border-collapse: collapse; text-align: center; font-size: 0.92rem; }
+    table { width: 100%; border-collapse: collapse; text-align: center; font-size: 0.9rem; }
     th, td { padding: 8px 10px; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
 
     thead th {
@@ -221,9 +231,33 @@
       box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
 
-    .sticky-col-1 { position: sticky; left: 0; background-color: #1c1f26; z-index: 5; text-align: left; min-width: 110px; }
-    .sticky-col-2 { position: sticky; left: 110px; background-color: #1c1f26; z-index: 5; text-align: left; min-width: 150px; font-weight: 600; }
-    .sticky-col-3 { position: sticky; left: 260px; background-color: #1c1f26; z-index: 5; min-width: 65px; color: var(--accent-yellow); border-right: 2px solid var(--border-color); }
+    /* 桌面版寬度與定位 */
+    .sticky-col-1 {
+      position: sticky;
+      left: 0;
+      background-color: #1c1f26;
+      z-index: 5;
+      text-align: left;
+      min-width: 105px;
+    }
+    .sticky-col-2 {
+      position: sticky;
+      left: 105px;
+      background-color: #1c1f26;
+      z-index: 5;
+      text-align: left;
+      min-width: 145px;
+      font-weight: 600;
+    }
+    .sticky-col-3 {
+      position: sticky;
+      left: 250px;
+      background-color: #1c1f26;
+      z-index: 5;
+      min-width: 60px;
+      color: var(--accent-yellow);
+      border-right: 2px solid var(--border-color);
+    }
 
     thead th.sticky-col-1, thead th.sticky-col-2, thead th.sticky-col-3 { z-index: 15; background-color: #232833; }
 
@@ -232,10 +266,33 @@
     tbody tr:hover { background-color: var(--row-hover); }
     tbody tr:hover .sticky-col-1, tbody tr:hover .sticky-col-2, tbody tr:hover .sticky-col-3 { background-color: var(--row-hover); }
 
+    /* 本人高亮欄位 */
     .current-user-col {
-      background-color: rgba(59, 130, 246, 0.08) !important;
-      border-left: 1px dashed var(--accent-blue);
-      border-right: 1px dashed var(--accent-blue);
+      background-color: rgba(59, 130, 246, 0.12) !important;
+      border-left: 2px solid var(--accent-blue);
+      border-right: 2px solid var(--accent-blue);
+    }
+    thead th.current-user-col {
+      background-color: #1e2e4a !important;
+      color: #93c5fd;
+    }
+
+    /* 他人唯讀欄位樣式 */
+    .readonly-col {
+      color: var(--text-muted);
+      min-width: 65px;
+    }
+    .readonly-val {
+      display: inline-block;
+      font-weight: 600;
+      color: #d1d5db;
+    }
+    .readonly-val.has-qty {
+      color: #60a5fa;
+      font-weight: 700;
+    }
+    .readonly-val.zero {
+      color: #4b5563;
     }
 
     .qty-control {
@@ -243,24 +300,25 @@
       align-items: center;
       background-color: #272c36;
       border-radius: 6px;
-      border: 1px solid #374151;
+      border: 1px solid #3b82f6;
     }
     .qty-btn {
       background: transparent;
       border: none;
-      color: #9ca3af;
+      color: #93c5fd;
       padding: 3px 8px;
       cursor: pointer;
       font-size: 0.95rem;
+      font-weight: bold;
     }
-    .qty-btn:hover { background-color: #374151; color: white; }
+    .qty-btn:hover { background-color: #3b82f6; color: white; }
     .qty-input {
-      width: 36px;
+      width: 34px;
       text-align: center;
       background: transparent;
       border: none;
       color: white;
-      font-weight: 600;
+      font-weight: 700;
       outline: none;
     }
 
@@ -276,26 +334,62 @@
     .col-summary-qty { background-color: rgba(249, 115, 22, 0.1); color: var(--accent-orange); font-weight: bold; }
     .col-summary-amount { background-color: rgba(234, 179, 8, 0.1); color: var(--accent-yellow); font-weight: bold; }
 
-    .delete-member-btn { background: none; color: #9ca3af; font-size: 0.75rem; margin-left: 4px; }
-    .delete-member-btn:hover { color: var(--accent-red); }
+    .btn-clear-my-header {
+      background: none;
+      border: none;
+      color: #f87171;
+      font-size: 0.72rem;
+      cursor: pointer;
+      margin-left: 4px;
+      padding: 1px 4px;
+      border-radius: 4px;
+    }
+    .btn-clear-my-header:hover { background-color: rgba(239, 68, 68, 0.2); }
+
+    /* ==========================================
+       📱 手機版 RWD 優化：隱藏第 1 欄「分類」
+       ========================================== */
+    @media (max-width: 768px) {
+      .col-category,
+      th.col-category,
+      td.col-category {
+        display: none !important;
+      }
+
+      /* 品項名稱移至最左側 (0px) */
+      .sticky-col-2 {
+        left: 0 !important;
+        min-width: 120px !important;
+      }
+      /* 單價緊接著品項名稱 (120px) */
+      .sticky-col-3 {
+        left: 120px !important;
+        min-width: 55px !important;
+      }
+
+      .brand-title h2 { font-size: 1.1rem; }
+      .brand-badge { font-size: 1rem; padding: 3px 8px; }
+      .submit-panel { padding: 10px; }
+      .toolbar { padding: 8px; }
+    }
 
     .modal-overlay {
       display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
       background: rgba(0, 0, 0, 0.75); z-index: 100;
-      justify-content: center; align-items: center; padding: 20px;
+      justify-content: center; align-items: center; padding: 16px;
     }
     .modal-content {
       background-color: var(--card-bg); border: 1px solid var(--border-color);
       width: 100%; max-width: 600px; max-height: 85vh; border-radius: 12px;
       display: flex; flex-direction: column;
     }
-    .modal-header { padding: 14px 18px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
-    .modal-body { padding: 18px; overflow-y: auto; }
-    .modal-footer { padding: 12px 18px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px; }
+    .modal-header { padding: 12px 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+    .modal-body { padding: 16px; overflow-y: auto; }
+    .modal-footer { padding: 12px 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px; }
     textarea.summary-text {
       width: 100%; height: 260px; background-color: #121418;
       border: 1px solid var(--border-color); color: #e5e7eb;
-      padding: 12px; border-radius: 8px; font-family: monospace; font-size: 0.88rem;
+      padding: 10px; border-radius: 8px; font-family: monospace; font-size: 0.85rem;
     }
     .order-item-chip { display: flex; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid #282f3d; }
   </style>
@@ -303,6 +397,7 @@
 <body>
 
   <div class="container">
+    <!-- 頂部操作與送出區 -->
     <div class="submit-panel">
       <div class="submit-left">
         <span class="submit-badge">點餐身分</span>
@@ -311,22 +406,23 @@
           🚀 送出我的點餐到雲端
         </button>
         <button class="btn-secondary" onclick="fetchFromGoogleDrive(true)">
-          🔄 取得雲端最新點單
+          🔄 重新整理
         </button>
       </div>
 
       <div class="sync-status-indicator">
         <span class="status-dot" id="status-dot"></span>
-        <span id="sync-status-text">本機隨意點選，點擊「送出」後才上傳同步</span>
+        <span id="sync-status-text">僅可修改自己的點單，選完請按「送出」</span>
       </div>
     </div>
 
+    <!-- 標題與即時統計 -->
     <header>
       <div class="brand-title">
         <div class="brand-badge">燒夜</div>
         <div>
           <h2>多人點餐與費用統計矩陣</h2>
-          <div class="brand-subtitle">Google Drive 試算表 (批次送出防衝突版)</div>
+          <div class="brand-subtitle">Google Drive 試算表 (安全權限保護版)</div>
         </div>
       </div>
       <div class="stats-bar">
@@ -336,7 +432,7 @@
         </div>
         <div class="stat-card">
           <div class="stat-label">已點總數量</div>
-          <div class="stat-value" id="grand-total-qty">0 份/串</div>
+          <div class="stat-value" id="grand-total-qty">0 串/份</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">用餐人數</div>
@@ -345,25 +441,28 @@
       </div>
     </header>
 
+    <!-- 工具列 -->
     <div class="toolbar">
       <div class="member-controls">
         <input type="text" id="new-member-name" placeholder="新增人員姓名..." maxlength="10">
         <button class="btn-primary" onclick="addMember()">＋ 新增人員</button>
+        <button class="btn-danger-outline" onclick="clearMyOrder()">🗑️ 清空我的點單</button>
       </div>
       <div class="action-controls">
         <button class="btn-secondary" onclick="openKitchenModal()">📋 店家劃單彙整</button>
         <button class="btn-success" onclick="openShareModal()">💬 複製 LINE 明細</button>
-        <button class="btn-danger" onclick="resetAllOrders()">🗑️ 清空所有點單</button>
       </div>
     </div>
 
+    <!-- 點餐矩陣主表格 -->
     <div class="table-container">
       <table id="matrix-table">
         <thead>
           <tr id="table-header-row">
-            <th class="sticky-col-1">分類</th>
+            <th class="sticky-col-1 col-category">分類</th>
             <th class="sticky-col-2">品項名稱</th>
             <th class="sticky-col-3">單價</th>
+            <!-- 動態成員表頭 -->
             <th class="col-summary-qty">店家劃單總量</th>
             <th class="col-summary-amount">品項小計</th>
           </tr>
@@ -371,9 +470,10 @@
         <tbody id="matrix-tbody"></tbody>
         <tfoot>
           <tr id="table-foot-row">
-            <td class="sticky-col-1">統計</td>
+            <td class="sticky-col-1 col-category">統計</td>
             <td class="sticky-col-2">個人應付總計</td>
             <td class="sticky-col-3">-</td>
+            <!-- 動態個人金額 -->
             <td id="foot-total-qty" class="col-summary-qty">0</td>
             <td id="foot-total-amount" class="col-summary-amount">NT$ 0</td>
           </tr>
@@ -382,6 +482,7 @@
     </div>
   </div>
 
+  <!-- 店家劃單彈窗 -->
   <div class="modal-overlay" id="kitchen-modal">
     <div class="modal-content">
       <div class="modal-header">
@@ -395,6 +496,7 @@
     </div>
   </div>
 
+  <!-- LINE 分帳明細彈窗 -->
   <div class="modal-overlay" id="share-modal">
     <div class="modal-content">
       <div class="modal-header">
@@ -415,7 +517,8 @@
     // ==============================================================
     // ⚠️ 請在此填入您的 Google Apps Script 網址 (結尾必須是 /exec)
     // ==============================================================
-    const GOOGLE_GAS_API_URL = "https://script.google.com/macros/s/AKfycbwFvuEqvZ7Y3cc2jykLv47ReiadY4tQoTVzvkzCbyzpKV2ITaRn-voo1lR4AXZh4bcAUg/exec";
+    const GOOGLE_GAS_API_URL = "https://script.google.com/macros/s/AKfycbwFvuEqvZ7Y3cc2jykLv47ReiadY4tQoTVzvkzCbyzpKV2ITaRn-voo1lR4AXZh4bcAUg/exec
+";
 
     const MENU_DATA = [
       { id: "A01", category: "鹽烤串燒", name: "牛肋串 (鹽烤)", price: 50, unit: "串" },
@@ -518,7 +621,6 @@
       if (isSubmitting) return;
       updateStatus("syncing", isManual ? "🔄 正在從 Google 試算表拉取最新點單..." : "連線中...");
 
-      // 加上 redirect: follow 支援 GAS 的 302 跳轉
       fetch(GOOGLE_GAS_API_URL, {
         method: "GET",
         mode: "cors",
@@ -568,7 +670,6 @@
         menuSummary: MENU_DATA
       };
 
-      // 使用 text/plain 避免觸發 OPTIONS Preflight 阻擋
       fetch(GOOGLE_GAS_API_URL, {
         method: "POST",
         mode: "cors",
@@ -606,60 +707,77 @@
         btn.innerText = "🚀 送出我的點餐到雲端";
         console.error("送出失敗詳細資訊:", err);
         updateStatus("offline", "❌ 送出失敗，資料已安全暫存在手機本機");
-        alert(`連線至 Google 失敗！\n錯誤原因：${err.message}\n\n請檢查：\n1. Google Apps Script 的「誰可以存取」是否已改為「所有人」\n2. 網址結尾是否為 /exec`);
+        alert(`連線至 Google 失敗！\n錯誤原因：${err.message}\n\n請檢查 GAS 權限設定與網址。`);
       });
     }
 
     function renderTable() {
+      // 1. 渲染表頭 (注意：分類欄包含 col-category 類別)
       const headerRow = document.getElementById("table-header-row");
       headerRow.innerHTML = `
-        <th class="sticky-col-1">分類</th>
+        <th class="sticky-col-1 col-category">分類</th>
         <th class="sticky-col-2">品項名稱</th>
         <th class="sticky-col-3">單價</th>
       `;
-      members.forEach((m, idx) => {
+
+      members.forEach(m => {
         const th = document.createElement("th");
         if (m === currentUser) {
           th.className = "current-user-col";
-          th.innerHTML = `<span>⭐ ${escapeHtml(m)} (我)</span>`;
-        } else {
           th.innerHTML = `
-            <span>${escapeHtml(m)}</span>
-            <button class="delete-member-btn" title="刪除" onclick="removeMember(${idx})">✕</button>
+            <span>⭐ ${escapeHtml(m)} (我)</span>
+            <button class="btn-clear-my-header" title="清空我點的項目" onclick="clearMyOrder()">清空</button>
           `;
+        } else {
+          // 非點餐身分：嚴格隱藏刪除按鈕，僅單純顯示姓名
+          th.className = "readonly-col";
+          th.innerHTML = `<span>${escapeHtml(m)}</span>`;
         }
         headerRow.appendChild(th);
       });
+
       headerRow.innerHTML += `
         <th class="col-summary-qty">店家總量</th>
         <th class="col-summary-amount">品項小計</th>
       `;
 
+      // 2. 渲染品項列
       const tbody = document.getElementById("matrix-tbody");
       tbody.innerHTML = "";
 
       MENU_DATA.forEach(item => {
         const tr = document.createElement("tr");
         let cellsHtml = `
-          <td class="sticky-col-1"><span class="badge-category">${item.category}</span></td>
+          <td class="sticky-col-1 col-category"><span class="badge-category">${item.category}</span></td>
           <td class="sticky-col-2">${item.name}</td>
           <td class="sticky-col-3">$${item.price}</td>
         `;
 
         members.forEach(m => {
           const qty = (orders[m] && orders[m][item.id]) ? orders[m][item.id] : 0;
-          const colClass = (m === currentUser) ? "current-user-col" : "";
-          cellsHtml += `
-            <td class="${colClass}">
-              <div class="qty-control">
-                <button class="qty-btn" onclick="changeQty('${m}', '${item.id}', -1)">-</button>
-                <input type="number" class="qty-input" min="0" max="99" 
-                       value="${qty}" 
-                       onchange="setQty('${m}', '${item.id}', this.value)" />
-                <button class="qty-btn" onclick="changeQty('${m}', '${item.id}', 1)">+</button>
-              </div>
-            </td>
-          `;
+
+          if (m === currentUser) {
+            // ⭐ 自己的欄位：提供完整的 + / - / 數字輸入
+            cellsHtml += `
+              <td class="current-user-col">
+                <div class="qty-control">
+                  <button class="qty-btn" onclick="changeQty('${item.id}', -1)">-</button>
+                  <input type="number" class="qty-input" min="0" max="99" 
+                         value="${qty}" 
+                         onchange="setQty('${item.id}', this.value)" />
+                  <button class="qty-btn" onclick="changeQty('${item.id}', 1)">+</button>
+                </div>
+              </td>
+            `;
+          } else {
+            // 🔒 非自己的欄位：嚴格唯讀，禁止修改
+            const valClass = qty > 0 ? "readonly-val has-qty" : "readonly-val zero";
+            cellsHtml += `
+              <td class="readonly-col">
+                <span class="${valClass}">${qty > 0 ? qty : "-"}</span>
+              </td>
+            `;
+          }
         });
 
         cellsHtml += `
@@ -676,14 +794,14 @@
     function renderFooter() {
       const footRow = document.getElementById("table-foot-row");
       footRow.innerHTML = `
-        <td class="sticky-col-1">統計</td>
+        <td class="sticky-col-1 col-category">統計</td>
         <td class="sticky-col-2">個人應付總計</td>
         <td class="sticky-col-3">-</td>
       `;
 
       members.forEach((m, idx) => {
-        const colClass = (m === currentUser) ? "current-user-col" : "";
-        footRow.innerHTML += `<td id="member-total-${idx}" class="${colClass}">$0 (0件)</td>`;
+        const colClass = (m === currentUser) ? "current-user-col" : "readonly-col";
+        footRow.innerHTML += `<td id="member-total-${idx}" class="${colClass}">$0 (0項)</td>`;
       });
 
       footRow.innerHTML += `
@@ -692,20 +810,21 @@
       `;
     }
 
-    function changeQty(member, itemId, delta) {
-      if (!orders[member]) orders[member] = {};
-      let current = orders[member][itemId] || 0;
-      orders[member][itemId] = Math.max(0, current + delta);
+    // 只能修改 currentUser 自己的數量
+    function changeQty(itemId, delta) {
+      if (!orders[currentUser]) orders[currentUser] = {};
+      let current = orders[currentUser][itemId] || 0;
+      orders[currentUser][itemId] = Math.max(0, current + delta);
       saveLocal();
       renderTable();
       calculateAll();
       showUnsavedHint();
     }
 
-    function setQty(member, itemId, val) {
-      if (!orders[member]) orders[member] = {};
+    function setQty(itemId, val) {
+      if (!orders[currentUser]) orders[currentUser] = {};
       let parsed = parseInt(val, 10);
-      orders[member][itemId] = isNaN(parsed) || parsed < 0 ? 0 : parsed;
+      orders[currentUser][itemId] = isNaN(parsed) || parsed < 0 ? 0 : parsed;
       saveLocal();
       renderTable();
       calculateAll();
@@ -713,7 +832,7 @@
     }
 
     function showUnsavedHint() {
-      updateStatus("syncing", "✏️ 本機已修改，選完請記得點擊上方「送出我的點餐」！");
+      updateStatus("syncing", "✏️ 本機已修改，選完請記得點擊「送出我的點餐」！");
     }
 
     function saveLocal() {
@@ -737,36 +856,16 @@
       showUnsavedHint();
     }
 
-    function removeMember(idx) {
-      const target = members[idx];
-      if (confirm(`確定移除「${target}」嗎？`)) {
-        delete orders[target];
-        members.splice(idx, 1);
-        if (currentUser === target) currentUser = members[0] || "";
+    // ⭐ 只能清空自己的點餐資料
+    function clearMyOrder() {
+      if (!currentUser) return;
+      if (confirm(`確定要清空「${currentUser}」已選的所有品項嗎？`)) {
+        orders[currentUser] = {};
         saveLocal();
-        renderUserSelect();
         renderTable();
         calculateAll();
         showUnsavedHint();
-      }
-    }
-
-    function resetAllOrders() {
-      if (confirm("⚠️ 確定要將全桌的所有點餐數量歸零嗎？")) {
-        members.forEach(m => orders[m] = {});
-        saveLocal();
-        renderTable();
-        calculateAll();
-
-        if (GOOGLE_GAS_API_URL && !GOOGLE_GAS_API_URL.includes("您的部署ID")) {
-          fetch(GOOGLE_GAS_API_URL, {
-            method: "POST",
-            mode: "cors",
-            redirect: "follow",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify({ action: "reset_all", members: members, orders: orders, menuSummary: MENU_DATA })
-          }).then(() => alert("已清空全桌點單並同步至雲端！"));
-        }
+        alert(`已清空「${currentUser}」的所有點單！如需同步至雲端請點擊送出。`);
       }
     }
 
@@ -799,12 +898,12 @@
         });
         const cell = document.getElementById(`member-total-${idx}`);
         if (cell) {
-          cell.innerHTML = `<strong>NT$ ${mAmount.toLocaleString()}</strong><br><span style="font-size:0.75rem; color:#9ca3af;">(${mQty}件)</span>`;
+          cell.innerHTML = `<strong>NT$ ${mAmount.toLocaleString()}</strong><br><span style="font-size:0.75rem; color:#9ca3af;">(${mQty}項)</span>`;
         }
       });
 
       document.getElementById("grand-total-amount").innerText = `NT$ ${grandTotalAmount.toLocaleString()}`;
-      document.getElementById("grand-total-qty").innerText = `${grandTotalQty} 份/串`;
+      document.getElementById("grand-total-qty").innerText = `${grandTotalQty} 串/份`;
       document.getElementById("total-members-count").innerText = `${members.length} 人`;
 
       const footQty = document.getElementById("foot-total-qty");
@@ -873,7 +972,7 @@
         text += detailList.length > 0 ? `   明細：${detailList.join("、")}\n\n` : `   明細：(無點餐)\n\n`;
       });
 
-      text += `---------------------------------\n💰 全桌總金額：NT$ ${grandTotal}\n🍢 總數量：${totalQty} 份/串\n📅 統計時間：${new Date().toLocaleString("zh-TW", {hour12: false})}\n`;
+      text += `---------------------------------\n💰 全桌總金額：NT$ ${grandTotal}\n🍢 總數量：${totalQty} 串/份\n📅 統計時間：${new Date().toLocaleString("zh-TW", {hour12: false})}\n`;
       document.getElementById("share-text-area").value = text;
       document.getElementById("share-modal").style.display = "flex";
     }
