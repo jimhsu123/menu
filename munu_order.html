@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>多店家多人點餐系統 - menu_order</title>
 <style>
+/* CSS 樣式與上一版相同，此處省略以節省篇幅 */
 :root {
 --bg-dark: #121418;--card-bg: #1c1f26;--border-color: #2e3440;--accent-orange: #f97316;--accent-red: #ef4444;--accent-yellow: #eab308;--accent-green: #10b981;--accent-blue: #3b82f6;--text-main: #f3f4f6;--text-muted: #9ca3af;--row-even: #1e222a;--row-hover: #2a303c;
 }
@@ -168,7 +169,7 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
 </head>
 <body>
 <div class="container">
-<!-- 頂部操作與送出區 -->
+<!-- UI Elements -->
 <div class="submit-panel">
     <div class="submit-left">
         <span class="submit-badge">選擇店家</span>
@@ -184,16 +185,14 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
     </div>
     <div class="sync-status-indicator">
         <span class="status-dot" id="status-dot"></span>
-        <span id="sync-status-text">僅可修改自己的點單，選完請按「送出」</span>
+        <span id="sync-status-text"></span>
     </div>
 </div>
-
-<!-- 標題與即時統計 -->
 <header>
     <div class="brand-title">
-        <div class="brand-badge" id="store-brand-badge">點餐</div>
+        <div class="brand-badge" id="store-brand-badge"></div>
         <div>
-            <h2 id="store-title">多店家點餐與費用矩陣</h2>
+            <h2 id="store-title"></h2>
             <div class="brand-subtitle">menu_order - Google Sheets 同步版</div>
         </div>
     </div>
@@ -212,7 +211,6 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
         </div>
     </div>
 </header>
-<!-- 工具列 -->
 <div class="toolbar">
     <div class="member-controls">
         <input type="text" id="new-member-name" placeholder="新增人員姓名..." maxlength="10">
@@ -224,64 +222,35 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
         <button class="btn-success" onclick="openShareModal()">複製 LINE 明細</button>
     </div>
 </div>
-<!-- 點餐矩陣主表格 -->
 <div class="table-container">
     <table id="matrix-table">
         <thead>
-            <tr id="table-header-row">
-                <th class="sticky-col-1 col-category">分類</th>
-                <th class="sticky-col-2">品項名稱</th>
-                <th class="sticky-col-3">單價</th>
-                <th class="col-summary-qty">店家劃單總量</th>
-                <th class="col-summary-amount">品項小計</th>
-            </tr>
+            <tr id="table-header-row"></tr>
         </thead>
         <tbody id="matrix-tbody"></tbody>
         <tfoot>
-            <tr id="table-foot-row">
-                <td class="sticky-col-1 col-category">統計</td>
-                <td class="sticky-col-2">個人應付總計</td>
-                <td class="sticky-col-3">-</td>
-                <td id="foot-total-qty" class="col-summary-qty">0</td>
-                <td id="foot-total-amount" class="col-summary-amount">NT$ 0</td>
-            </tr>
+            <tr id="table-foot-row"></tr>
         </tfoot>
     </table>
 </div>
 </div>
-<!-- 店家劃單彈窗 -->
-<div class="modal-overlay" id="kitchen-modal">
-<div class="modal-content">
-    <div class="modal-header">
-        <h3>店家劃單彙整清單 (僅顯示有數量品項)</h3>
-        <button class="btn-secondary" onclick="closeModal('kitchen-modal')">×</button>
-    </div>
-    <div class="modal-body" id="kitchen-list-body"></div>
-    <div class="modal-footer">
-        <button class="btn-primary" onclick="closeModal('kitchen-modal')">關閉</button>
-    </div>
-</div>
-</div>
-<!-- LINE 分帳明細彈窗 -->
-<div class="modal-overlay" id="share-modal">
-<div class="modal-content">
-    <div class="modal-header">
-        <h3>LINE 對帳明細訊息</h3>
-        <button class="btn-secondary" onclick="closeModal('share-modal')">×</button>
-    </div>
-    <div class="modal-body">
-        <textarea id="share-text-area" class="summary-text" readonly></textarea>
-    </div>
-    <div class="modal-footer">
-        <button class="btn-success" onclick="copyShareText()">複製到剪貼簿</button>
-        <button class="btn-secondary" onclick="closeModal('share-modal')">關閉</button>
-    </div>
-</div>
-</div>
-<script>
-// 請替換為您部署的 Google Apps Script 網址 (/exec)
-const GOOGLE_GAS_API_URL = "https://script.google.com/macros/s/AKfycbz8gYMeG3W1h_G4HrN7bdGEey74q7pnkHFcAGBYgDUjRKU3Cw6Se8pKIHzqu7qBTR0Nug/exec"; 
+<!-- Modals -->
+<div class="modal-overlay" id="kitchen-modal"><div class="modal-content"><div class="modal-header"><h3>店家劃單彙整清單</h3><button class="btn-secondary" onclick="closeModal('kitchen-modal')">×</button></div><div class="modal-body" id="kitchen-list-body"></div><div class="modal-footer"><button class="btn-primary" onclick="closeModal('kitchen-modal')">關閉</button></div></div></div>
+<div class="modal-overlay" id="share-modal"><div class="modal-content"><div class="modal-header"><h3>LINE 對帳明細訊息</h3><button class="btn-secondary" onclick="closeModal('share-modal')">×</button></div><div class="modal-body"><textarea id="share-text-area" class="summary-text" readonly></textarea></div><div class="modal-footer"><button class="btn-success" onclick="copyShareText()">複製到剪貼簿</button><button class="btn-secondary" onclick="closeModal('share-modal')">關閉</button></div></div></div>
 
+<script>
+// ===============================================
+// ======== CONFIGURATION (請在此修改) =============
+// ===============================================
+// 1. 請替換為您新部署的 Google Apps Script 網址
+const GOOGLE_GAS_API_URL = ""; 
+
+// 2. 請將此密鑰改為您自訂的、複雜的、隨機的字串。後端 Code.gs 中也必須使用完全相同的密鑰。
+const API_TOKEN = "MySuP3rS3cR3tT0kEn20260918!"; 
+
+// ===============================================
+// ======== MENU DATA (菜單資料) =================
+// ===============================================
 const ALL_MENUS = {
     "shaoye": {
         name: "燒夜串燒",
@@ -489,12 +458,17 @@ const ALL_MENUS = {
     }
 };
 
+// ===============================================
+// ======== CORE LOGIC (核心程式) ================
+// ===============================================
 let MENU_DATA = [];
 let members = [];
 let orders = {};
 let currentUser = "";
 let currentStore = localStorage.getItem("menu_order_current_store") || Object.keys(ALL_MENUS)[0];
 let isSubmitting = false;
+
+window.onload = init;
 
 function init() {
     renderStoreSelect();
@@ -594,13 +568,13 @@ function switchCurrentUser() {
 
 function fetchFromGoogleDrive(isManual = false) {
     if (isSubmitting) return;
-    if (!GOOGLE_GAS_API_URL || GOOGLE_GAS_API_URL.includes("YOUR_DEPLOY_ID")){
-        if(isManual) alert("尚未設定 Google Apps Script 部署網址。");
+    if (!GOOGLE_GAS_API_URL || GOOGLE_GAS_API_URL.includes("YOUR_DEPLOY_ID") || API_TOKEN.includes("CHANGE_THIS")) {
+        if(isManual) alert("尚未設定 Google Apps Script 部署網址或 API Token。");
         return;
     }
     updateStatus("syncing", isManual ? `🔄 正在從雲端同步「${ALL_MENUS[currentStore].name}」的資料...` : "連線中...");
     
-    const fetchUrl = `${GOOGLE_GAS_API_URL}?storeId=${currentStore}`;
+    const fetchUrl = `${GOOGLE_GAS_API_URL}?storeId=${currentStore}&token=${API_TOKEN}`;
 
     fetch(fetchUrl, { method: "GET", mode: "cors", redirect: "follow" })
     .then(res => res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`)))
@@ -616,19 +590,19 @@ function fetchFromGoogleDrive(isManual = false) {
             }
             updateStatus("online", `✅ 「${ALL_MENUS[currentStore].name}」資料已同步 (${new Date().toLocaleTimeString()})`);
         } else {
-            throw new Error(res.message || "後端回傳格式錯誤");
+            throw new Error(res.message || "後端回傳格式錯誤或 Token 錯誤");
         }
     })
     .catch(err => {
         console.warn("拉取失敗:", err);
-        updateStatus("offline", "❗️ 無法連線或同步資料");
+        updateStatus("offline", "❗️ 無法連線或同步資料 (Token/權限錯誤?)");
     });
 }
 
 function submitMyOrderToCloud() {
     if (!currentUser) return alert("請先選擇您的姓名!");
-    if (!GOOGLE_GAS_API_URL || GOOGLE_GAS_API_URL.includes("YOUR_DEPLOY_ID")) {
-        return alert("請先在程式碼中的 GOOGLE_GAS_API_URL 填入您的 Google Apps Script 部署網址!");
+    if (!GOOGLE_GAS_API_URL || GOOGLE_GAS_API_URL.includes("YOUR_DEPLOY_ID") || API_TOKEN.includes("CHANGE_THIS")) {
+        return alert("請先在程式碼中設定 GOOGLE_GAS_API_URL 與 API_TOKEN!");
     }
     const btn = document.getElementById("btn-submit-order");
     btn.disabled = true;
@@ -637,6 +611,7 @@ function submitMyOrderToCloud() {
     isSubmitting = true;
 
     const payload = {
+        token: API_TOKEN,
         action: "update_member",
         storeId: currentStore,
         storeName: ALL_MENUS[currentStore].name,
@@ -669,13 +644,13 @@ function submitMyOrderToCloud() {
             updateStatus("online", `✅ 已成功送出! (${new Date().toLocaleTimeString()} 已存入試算表)`);
             alert(`「${currentUser}」於「${ALL_MENUS[currentStore].name}」的點餐已成功更新至 Google 試算表!`);
         } else {
-            throw new Error(res.message);
+            throw new Error(res.message || "後端處理失敗");
         }
     })
     .catch(err => {
         console.error("送出失敗詳細資訊:", err);
         updateStatus("offline", "❌ 送出失敗，資料已安全暫存在本機");
-        alert(`連線至 Google 失敗!\n錯誤原因: ${err.message}\n\n請檢查 GAS 權限設定與網址。`);
+        alert(`連線至 Google 失敗!\n錯誤原因: ${err.message}\n\n請檢查 GAS 權限/Token設定與網址。`);
     })
     .finally(() => {
         isSubmitting = false;
@@ -699,13 +674,14 @@ function deleteSelfFromOrder() {
     renderTable();
     calculateAll();
 
-    if (GOOGLE_GAS_API_URL && !GOOGLE_GAS_API_URL.includes("YOUR_DEPLOY_ID")) {
+    if (GOOGLE_GAS_API_URL && !GOOGLE_GAS_API_URL.includes("YOUR_DEPLOY_ID") && !API_TOKEN.includes("CHANGE_THIS")) {
         updateStatus("syncing", `🔄 正在雲端刪除「${memberToDelete}」...`);
         fetch(GOOGLE_GAS_API_URL, {
             method: "POST",
             mode: "cors",
             headers: { "Content-Type": "text/plain;charset=utf-8" },
             body: JSON.stringify({
+                token: API_TOKEN,
                 action: "delete_member",
                 storeId: currentStore,
                 targetMember: memberToDelete,
@@ -991,7 +967,6 @@ function escapeHtml(string) {
     return String(string).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
-window.onload = init;
 </script>
 </body>
 </html>
