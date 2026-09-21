@@ -272,10 +272,6 @@ const _B64_API_TOKEN = "TXlTdVAzclMzY1IzdFQwa0VuMjAyNCE=";
 const GOOGLE_GAS_API_URL = atob(_B64_GAS_URL);
 const API_TOKEN = atob(_B64_API_TOKEN);
 
-
-
-
-
 // ===============================================
 // ======== MENU DATA (菜單資料庫) =================
 // ===============================================
@@ -407,7 +403,7 @@ const ALL_MENUS = {
             { id: 'DT69', category: '肉類&單點', name: '鴨心', price: 30, unit: '串' },
             { id: 'DT70', category: '肉類&單點', name: '豬頭皮', price: 45, unit: '份' },
             { id: 'DT71', category: '肉類&單點', name: '培根牛', price: 100, unit: '份' },
-            { id: 'DT72', category: '肉類&單點', name: '雞胗', price: 50, unit: '份' },
+            { id: 'DT72', category: '肉類&單點', name: '雞診', price: 50, unit: '份' },
             { id: 'DT73', category: '季節時蔬/菇類', name: '白蘿蔔', price: 25, unit: '份' },
             { id: 'DT74', category: '季節時蔬/菇類', name: '高麗菜', price: 40, unit: '份' },
             { id: 'DT75', category: '季節時蔬/菇類', name: '大陸妹', price: 40, unit: '份' },
@@ -495,6 +491,22 @@ let orders = {};
 let currentUser = "";
 let currentStore = localStorage.getItem("menu_order_current_store") || Object.keys(ALL_MENUS)[0];
 let isSubmitting = false;
+
+// 價格與金額顯示格式化函數
+// 單價：若有小數點顯示最多兩位，整數不補零
+function formatPrice(val) {
+    if (typeof val !== 'number') val = Number(val);
+    if (isNaN(val)) return '0';
+    return val.toLocaleString('zh-TW', { maximumFractionDigits: 2 });
+}
+
+// 總計/小計金額格式化：消除浮點數微小誤差，若有小數最多顯示兩位
+function formatAmount(val) {
+    if (typeof val !== 'number') val = Number(val);
+    if (isNaN(val)) return '0';
+    const rounded = Math.round((val + Number.EPSILON) * 100) / 100;
+    return rounded.toLocaleString('zh-TW', { maximumFractionDigits: 2 });
+}
 
 window.onload = init;
 
@@ -758,7 +770,7 @@ function renderTable() {
         let cellsHtml = `
             <td class="sticky-col-1 col-category"><span class="badge-category">${item.category}</span></td>
             <td class="sticky-col-2">${item.name}</td>
-            <td class="sticky-col-3">$${item.price}</td>
+            <td class="sticky-col-3">$${formatPrice(item.price)}</td>
         `;
         
         members.forEach(m => {
@@ -879,7 +891,7 @@ function calculateAll() {
         const cellQty = document.getElementById(`row-qty-${item.id}`);
         const cellAmount = document.getElementById(`row-amount-${item.id}`);
         if (cellQty) cellQty.innerText = rowQty;
-        if (cellAmount) cellAmount.innerText = `NT$ ${rowAmount.toLocaleString()}`;
+        if (cellAmount) cellAmount.innerText = `NT$ ${formatAmount(rowAmount)}`;
     });
     
     members.forEach((m, idx) => {
@@ -892,18 +904,18 @@ function calculateAll() {
         });
         const cell = document.getElementById(`member-total-${idx}`);
         if (cell) {
-            cell.innerHTML = `<strong>NT$ ${mAmount.toLocaleString()}</strong><br><span style="font-size:0.75rem">(${mQty}項)</span>`;
+            cell.innerHTML = `<strong>NT$ ${formatAmount(mAmount)}</strong><br><span style="font-size:0.75rem">(${mQty}項)</span>`;
         }
     });
 
-    document.getElementById("grand-total-amount").innerText = `NT$ ${grandTotalAmount.toLocaleString()}`;
+    document.getElementById("grand-total-amount").innerText = `NT$ ${formatAmount(grandTotalAmount)}`;
     document.getElementById("grand-total-qty").innerText = `${grandTotalQty} ${unit}`;
     document.getElementById("total-members-count").innerText = `${members.length} 人`;
     
     const footQty = document.getElementById("foot-total-qty");
     const footAmount = document.getElementById("foot-total-amount");
     if (footQty) footQty.innerText = grandTotalQty;
-    if (footAmount) footAmount.innerText = `NT$ ${grandTotalAmount.toLocaleString()}`;
+    if (footAmount) footAmount.innerText = `NT$ ${formatAmount(grandTotalAmount)}`;
 }
 
 function openKitchenModal() {
@@ -930,7 +942,7 @@ function openKitchenModal() {
             const chip = document.createElement("div");
             chip.className = "order-item-chip";
             chip.innerHTML = `
-                <span>${item.name} ($${item.price}/${item.unit})</span>
+                <span>${item.name} ($${formatPrice(item.price)}/${item.unit})</span>
                 <span style="font-weight:bold; font-size:1.1rem; color:var(--accent-yellow);">${totalQty} ${item.unit}</span>`;
             container.appendChild(chip);
         }
@@ -963,7 +975,7 @@ function openShareModal() {
         
         grandTotal += mTotal;
         totalQty += mCount;
-        text += `● ${m}: 應付 NT$ ${mTotal} (${mCount}項)\n`;
+        text += `● ${m}: 應付 NT$ ${formatAmount(mTotal)} (${mCount}項)\n`;
         text += detailList.length > 0 ? `  明細: ${detailList.join("、")}\n\n` : `  明細: (無點餐)\n\n`;
     });
     
@@ -972,7 +984,7 @@ function openShareModal() {
     if (storeInfo.name.includes("串燒")) unit = "串";
     if (storeInfo.name.includes("滷味")) unit = "樣";
 
-    text += `- - - - - - - - - - - - - - - - -\n💰 全桌總金額: NT$ ${grandTotal}\n📦 總數量: ${totalQty} ${unit}\n`;
+    text += `- - - - - - - - - - - - - - - - -\n💰 全桌總金額: NT$ ${formatAmount(grandTotal)}\n📦 總數量: ${totalQty} ${unit}\n`;
     document.getElementById("share-text-area").value = text;
     document.getElementById("share-modal").style.display = "flex";
 }
