@@ -403,7 +403,7 @@ const ALL_MENUS = {
             { id: 'DT69', category: '肉類&單點', name: '鴨心', price: 30, unit: '串' },
             { id: 'DT70', category: '肉類&單點', name: '豬頭皮', price: 45, unit: '份' },
             { id: 'DT71', category: '肉類&單點', name: '培根牛', price: 100, unit: '份' },
-            { id: 'DT72', category: '肉類&單點', name: '雞診', price: 50, unit: '份' },
+            { id: 'DT72', category: '肉類&單點', name: '雞胗', price: 50, unit: '份' },
             { id: 'DT73', category: '季節時蔬/菇類', name: '白蘿蔔', price: 25, unit: '份' },
             { id: 'DT74', category: '季節時蔬/菇類', name: '高麗菜', price: 40, unit: '份' },
             { id: 'DT75', category: '季節時蔬/菇類', name: '大陸妹', price: 40, unit: '份' },
@@ -493,14 +493,12 @@ let currentStore = localStorage.getItem("menu_order_current_store") || Object.ke
 let isSubmitting = false;
 
 // 價格與金額顯示格式化函數
-// 單價：若有小數點顯示最多兩位，整數不補零
 function formatPrice(val) {
     if (typeof val !== 'number') val = Number(val);
     if (isNaN(val)) return '0';
     return val.toLocaleString('zh-TW', { maximumFractionDigits: 2 });
 }
 
-// 總計/小計金額格式化：消除浮點數微小誤差，若有小數最多顯示兩位
 function formatAmount(val) {
     if (typeof val !== 'number') val = Number(val);
     if (isNaN(val)) return '0';
@@ -517,7 +515,8 @@ function init() {
     renderTable();
     calculateAll();
     updateBrand();
-    
+    updateUserModeUI();
+
     if (GOOGLE_GAS_API_URL && !GOOGLE_GAS_API_URL.includes("您的_GAS_API_URL_在此") && !GOOGLE_GAS_API_URL.includes("YOUR_DEPLOY_ID")) {
         fetchFromGoogleDrive(false);
     } else {
@@ -556,15 +555,16 @@ function renderStoreSelect() {
 function switchStore() {
     const newStore = document.getElementById("store-select").value;
     if (newStore === currentStore) return;
-    
+
     currentStore = newStore;
     localStorage.setItem("menu_order_current_store", currentStore);
-    
+
     loadLocalDataForStore();
     renderUserSelect();
     renderTable();
     calculateAll();
     updateBrand();
+    updateUserModeUI();
     if (GOOGLE_GAS_API_URL && !GOOGLE_GAS_API_URL.includes("您的_GAS_API_URL_在此")) {
         fetchFromGoogleDrive(false);
     }
@@ -586,8 +586,17 @@ function updateStatus(type, msg) {
 function renderUserSelect() {
     const select = document.getElementById("current-user-select");
     select.innerHTML = "";
-    if (!members.includes(currentUser)) {
-        currentUser = members[0] || "";
+
+    // 1. 管理者身分選項
+    const adminOpt = document.createElement("option");
+    adminOpt.value = "__ADMIN__";
+    adminOpt.innerText = "我是: 管理者 🛡️";
+    if (currentUser === "__ADMIN__") adminOpt.selected = true;
+    select.appendChild(adminOpt);
+
+    // 2. 成員身分選項
+    if (!members.includes(currentUser) && currentUser !== "__ADMIN__") {
+        currentUser = members[0] || "__ADMIN__";
     }
     members.forEach(m => {
         const opt = document.createElement("option");
@@ -603,6 +612,20 @@ function switchCurrentUser() {
     localStorage.setItem(`menu_order_user_${currentStore}`, currentUser);
     renderTable();
     calculateAll();
+    updateUserModeUI();
+}
+
+function updateUserModeUI() {
+    const btnSubmit = document.getElementById("btn-submit-order");
+    if (currentUser === "__ADMIN__") {
+        updateStatus("online", "🛡️ 管理者身分：點擊各成員標籤的「刪除」可徹底移除該員整行訂單");
+        btnSubmit.disabled = true;
+        btnSubmit.innerText = "管理者模式 (僅供管理)";
+    } else {
+        updateStatus("online", "僅可修改自己的點單，選完請按「送出」");
+        btnSubmit.disabled = false;
+        btnSubmit.innerText = "送出我的點餐";
+    }
 }
 
 function fetchFromGoogleDrive(isManual = false) {
@@ -612,7 +635,7 @@ function fetchFromGoogleDrive(isManual = false) {
         return;
     }
     updateStatus("syncing", isManual ? `🔄 正在從雲端同步「${ALL_MENUS[currentStore].name}」的資料...` : "連線中...");
-    
+
     const fetchUrl = `${GOOGLE_GAS_API_URL}?storeId=${currentStore}&token=${encodeURIComponent(API_TOKEN)}`;
 
     fetch(fetchUrl, { method: "GET", mode: "cors", redirect: "follow" })
@@ -639,6 +662,9 @@ function fetchFromGoogleDrive(isManual = false) {
 }
 
 function submitMyOrderToCloud() {
+    if (currentUser === "__ADMIN__") {
+        return alert("目前為管理者模式，僅供管理與刪除整行訂單。若要點餐請切換至個人身分！");
+    }
     if (!currentUser) return alert("請先選擇您的姓名!");
     if (!GOOGLE_GAS_API_URL || GOOGLE_GAS_API_URL.includes("您的_GAS_API_URL_在此")) {
         return alert("請先在程式碼中的 GOOGLE_GAS_API_URL 填入您的 Google Apps Script 部署網址!");
@@ -698,43 +724,75 @@ function submitMyOrderToCloud() {
     });
 }
 
-function deleteSelfFromOrder() {
-    if (!currentUser) return;
-    const confirmDelete = confirm(`確定不參加「${ALL_MENUS[currentStore].name}」的點餐嗎?\n\n這將會徹底刪除「${currentUser}」的點單資料，並從表格中移除!`);
+// 僅限管理者調用的整行訂單刪除功能（增強版雲端同步）
+function adminDeleteMember(memberToDelete) {
+    if (currentUser !== "__ADMIN__") {
+        alert("權限不足：只有在「我是管理者」身分時才可以刪除整行訂單資料！");
+        return;
+    }
+    const storeInfo = ALL_MENUS[currentStore] || { name: "" };
+    const confirmDelete = confirm(`【管理者操作】確定要刪除「${memberToDelete}」在「${storeInfo.name}」的整行訂單資料嗎？\n\n這將會徹底移除該人員整欄及其點餐內容，並同步至雲端試算表！`);
     if (!confirmDelete) return;
-    
-    const memberToDelete = currentUser;
+
+    // 本機端先移除該人員及訂單
     members = members.filter(m => m !== memberToDelete);
     delete orders[memberToDelete];
-    currentUser = members.length > 0 ? members[0] : "";
     saveLocal();
     renderUserSelect();
     renderTable();
     calculateAll();
 
-    if (GOOGLE_GAS_API_URL && !GOOGLE_GAS_API_URL.includes("您的_GAS_API_URL_在此")) {
-        updateStatus("syncing", `🔄 正在雲端刪除「${memberToDelete}」...`);
+    // 檢查是否有設定雲端 GAS URL
+    if (GOOGLE_GAS_API_URL && !GOOGLE_GAS_API_URL.includes("您的_GAS_API_URL_在此") && !GOOGLE_GAS_API_URL.includes("YOUR_DEPLOY_ID")) {
+        updateStatus("syncing", `🔄 管理者正在雲端刪除「${memberToDelete}」整行訂單...`);
+
+        const payload = {
+            token: API_TOKEN,
+            action: "delete_member",
+            storeId: currentStore,
+            storeName: storeInfo.name,
+            targetMember: memberToDelete,
+            members: members,
+            orders: orders,
+            menuSummary: MENU_DATA
+        };
+
         fetch(GOOGLE_GAS_API_URL, {
             method: "POST",
             mode: "cors",
+            redirect: "follow",
             headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify({
-                token: API_TOKEN,
-                action: "delete_member",
-                storeId: currentStore,
-                targetMember: memberToDelete,
-                menuSummary: MENU_DATA
-            })
+            body: JSON.stringify(payload)
         })
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) throw new Error(`HTTP 狀態碼: ${res.status}`);
+            return res.json();
+        })
         .then(res => {
             if (res.status === "success") {
-                updateStatus("online", `✅ 已自雲端移除「${memberToDelete}」`);
+                if (res.mergedData) {
+                    members = res.mergedData.members || members;
+                    orders = res.mergedData.orders || orders;
+                    saveLocal();
+                    renderUserSelect();
+                    renderTable();
+                    calculateAll();
+                }
+                updateStatus("online", `✅ 管理者已成功自雲端刪除「${memberToDelete}」整行訂單 (${new Date().toLocaleTimeString()})`);
+                alert(`已成功將「${memberToDelete}」從「${storeInfo.name}」的雲端試算表中刪除！`);
+            } else {
+                throw new Error(res.message || "雲端後端回傳錯誤");
             }
         })
-        .catch(err => console.warn("雲端刪除失敗:", err));
+        .catch(err => {
+            console.error("雲端刪除失敗詳細資訊:", err);
+            updateStatus("offline", `❌ 雲端刪除失敗: ${err.message}`);
+            alert(`刪除「${memberToDelete}」時連線至 Google 試算表失敗！\n錯誤原因: ${err.message}\n\n本機已先移除，請檢查網路連線或 GAS 權限設定。`);
+        });
+    } else {
+        updateStatus("online", `✅ [單機模式] 已刪除「${memberToDelete}」的整行訂單資料`);
+        alert(`已成功刪除「${memberToDelete}」的整行訂單資料！（單機模式）`);
     }
-    alert(`已將「${memberToDelete}」從「${ALL_MENUS[currentStore].name}」的點餐名單中移除!`);
 }
 
 function renderTable() {
@@ -744,27 +802,37 @@ function renderTable() {
         <th class="sticky-col-2">品項名稱</th>
         <th class="sticky-col-3">單價</th>
     `;
-    
+
+    const isAdmin = (currentUser === "__ADMIN__");
+
     members.forEach(m => {
         const th = document.createElement("th");
-        if (m === currentUser) {
+        const safeMemberName = escapeHtml(m).replace(/'/g, "\\'");
+
+        if (isAdmin) {
+            // 管理者身分：每個成員欄位頂部皆有「刪除」按鈕，可刪除整行訂單
+            th.className = "readonly-col";
+            th.innerHTML = `<span>${escapeHtml(m)}</span><button class="btn-delete-self-header" title="管理者刪除此人員整行訂單" onclick="adminDeleteMember('${safeMemberName}')">刪除</button>`;
+        } else if (m === currentUser) {
+            // 一般本人身分：僅能點餐，無任何刪除按鈕
             th.className = "current-user-col";
-            th.innerHTML = `<span>${escapeHtml(m)} (我)</span><button class="btn-delete-self-header" title="我不參加,整欄刪除" onclick="deleteSelfFromOrder()">刪除</button>`;
+            th.innerHTML = `<span>${escapeHtml(m)} (我)</span>`;
         } else {
+            // 其他成員身分：無任何刪除按鈕
             th.className = "readonly-col";
             th.innerHTML = `<span>${escapeHtml(m)}</span>`;
         }
         headerRow.appendChild(th);
     });
-    
+
     headerRow.innerHTML += `
         <th class="col-summary-qty">店家總量</th>
         <th class="col-summary-amount">品項小計</th>
     `;
-    
+
     const tbody = document.getElementById("matrix-tbody");
     tbody.innerHTML = "";
-    
+
     MENU_DATA.forEach(item => {
         const tr = document.createElement("tr");
         let cellsHtml = `
@@ -772,10 +840,11 @@ function renderTable() {
             <td class="sticky-col-2">${item.name}</td>
             <td class="sticky-col-3">$${formatPrice(item.price)}</td>
         `;
-        
+
         members.forEach(m => {
             const qty = (orders[m] && orders[m][item.id]) ? orders[m][item.id] : 0;
-            if (m === currentUser) {
+            // 只有一般使用者身分切換到自己時，才能操作點餐數量控制器
+            if (!isAdmin && m === currentUser) {
                 cellsHtml += `
                     <td class="current-user-col">
                         <div class="qty-control">
@@ -790,16 +859,16 @@ function renderTable() {
                 cellsHtml += `<td class="readonly-col"><span class="${valClass}">${qty > 0 ? qty : "-"}</span></td>`;
             }
         });
-        
+
         cellsHtml += `
             <td class="col-summary-qty" id="row-qty-${item.id}">0</td>
             <td class="col-summary-amount" id="row-amount-${item.id}">NT$ 0</td>
         `;
-        
+
         tr.innerHTML = cellsHtml;
         tbody.appendChild(tr);
     });
-    
+
     renderFooter();
 }
 
@@ -811,7 +880,7 @@ function renderFooter() {
         <td class="sticky-col-3">-</td>
     `;
     members.forEach((m, idx) => {
-        const colClass = (m === currentUser) ? "current-user-col" : "readonly-col";
+        const colClass = (currentUser !== "__ADMIN__" && m === currentUser) ? "current-user-col" : "readonly-col";
         footHtml += `<td id="member-total-${idx}" class="${colClass}">$0 (0項)</td>`;
     });
     footHtml += `
@@ -822,6 +891,7 @@ function renderFooter() {
 }
 
 function changeQty(itemId, delta) {
+    if (currentUser === "__ADMIN__") return;
     if (!orders[currentUser]) orders[currentUser] = {};
     let current = Number(orders[currentUser][itemId] || 0);
     orders[currentUser][itemId] = Math.max(0, current + delta);
@@ -832,6 +902,7 @@ function changeQty(itemId, delta) {
 }
 
 function setQty(itemId, val) {
+    if (currentUser === "__ADMIN__") return;
     if (!orders[currentUser]) orders[currentUser] = {};
     let parsed = parseInt(val, 10);
     orders[currentUser][itemId] = isNaN(parsed) || parsed < 0 ? 0 : parsed;
@@ -848,6 +919,9 @@ function addMember() {
     const input = document.getElementById("new-member-name");
     const name = input.value.trim();
     if (!name) return alert("請輸入姓名!");
+    if (name === "管理者" || name.toLowerCase() === "admin") {
+        return alert("「管理者」為系統專用身分，請輸入個人的真實姓名！");
+    }
     if (members.includes(name)) return alert("已有同名人員!");
     members.push(name);
     orders[name] = {};
@@ -857,10 +931,14 @@ function addMember() {
     renderUserSelect();
     renderTable();
     calculateAll();
+    updateUserModeUI();
     showUnsavedHint();
 }
 
 function clearMyOrder() {
+    if (currentUser === "__ADMIN__") {
+        return alert("管理者身分無個人點單。如需刪除人員整行訂單，請直接點擊該人員頂部的「刪除」按鈕。");
+    }
     if (!currentUser) return;
     if (confirm(`確定要將「${currentUser}」在「${ALL_MENUS[currentStore].name}」已選的所有品項數量歸零嗎？`)) {
         orders[currentUser] = {};
@@ -887,13 +965,13 @@ function calculateAll() {
         let rowAmount = rowQty * item.price;
         grandTotalQty += rowQty;
         grandTotalAmount += rowAmount;
-        
+
         const cellQty = document.getElementById(`row-qty-${item.id}`);
         const cellAmount = document.getElementById(`row-amount-${item.id}`);
         if (cellQty) cellQty.innerText = rowQty;
         if (cellAmount) cellAmount.innerText = `NT$ ${formatAmount(rowAmount)}`;
     });
-    
+
     members.forEach((m, idx) => {
         let mQty = 0;
         let mAmount = 0;
@@ -911,7 +989,7 @@ function calculateAll() {
     document.getElementById("grand-total-amount").innerText = `NT$ ${formatAmount(grandTotalAmount)}`;
     document.getElementById("grand-total-qty").innerText = `${grandTotalQty} ${unit}`;
     document.getElementById("total-members-count").innerText = `${members.length} 人`;
-    
+
     const footQty = document.getElementById("foot-total-qty");
     const footAmount = document.getElementById("foot-total-amount");
     if (footQty) footQty.innerText = grandTotalQty;
@@ -923,13 +1001,13 @@ function openKitchenModal() {
     container.innerHTML = "";
     let hasItems = false;
     let currentCategory = "";
-    
+
     MENU_DATA.forEach(item => {
         let totalQty = 0;
         members.forEach(m => {
             if (orders[m] && orders[m][item.id]) totalQty += Number(orders[m][item.id]);
         });
-        
+
         if (totalQty > 0) {
             hasItems = true;
             if (item.category !== currentCategory) {
@@ -947,7 +1025,7 @@ function openKitchenModal() {
             container.appendChild(chip);
         }
     });
-    
+
     if (!hasItems) {
         container.innerHTML = `<div style="text-align:center; color:#9ca3af; padding:30px;">目前尚未點選任何品項!</div>`;
     }
@@ -959,7 +1037,7 @@ function openShareModal() {
     let text = `【${storeName} 點餐明細與收款分攤】\n- - - - - - - - - - - - - - - - -\n`;
     let grandTotal = 0;
     let totalQty = 0;
-    
+
     members.forEach(m => {
         let mTotal = 0;
         let mCount = 0;
@@ -972,13 +1050,13 @@ function openShareModal() {
                 detailList.push(`${item.name} x${qty}`);
             }
         });
-        
+
         grandTotal += mTotal;
         totalQty += mCount;
         text += `● ${m}: 應付 NT$ ${formatAmount(mTotal)} (${mCount}項)\n`;
         text += detailList.length > 0 ? `  明細: ${detailList.join("、")}\n\n` : `  明細: (無點餐)\n\n`;
     });
-    
+
     const storeInfo = ALL_MENUS[currentStore];
     let unit = "份";
     if (storeInfo.name.includes("串燒")) unit = "串";
