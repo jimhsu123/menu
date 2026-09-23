@@ -3,10 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- TODO: 請務必填入您在 GCP Console 取得的 Client ID -->
-<meta name="google-signin-client_id" content="YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com">
 <title>多店家多人點餐系統 - menu_order</title>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+<!-- 引入 Google Identity Services (GSI) SDK -->
+<script src="https://accounts.google.com/gsi/client" async defer onload="initGoogleSignIn()"></script>
 <style>
 :root {
   --bg-dark: #121418;--card-bg: #1c1f26;--border-color: #2e3440;--accent-orange: #f97316;
@@ -57,7 +56,7 @@ body {
 }
 #google-login-container { display: flex; align-items: center; gap: 10px; }
 #user-info { display: none; align-items: center; gap: 8px; font-size: 0.9rem; }
-#user-avatar { width: 28px; height: 28px; border-radius: 50%; }
+#user-avatar { width: 30px; height: 30px; border-radius: 50%; border: 1px solid #3b82f6; }
 .btn-submit-main {
   background: linear-gradient(135deg, #10b981, #059669);
   color: white;
@@ -77,7 +76,7 @@ body {
   background: linear-gradient(135deg, #059669, #047857);
   transform: translateY(-1px);
 }
-.btn-submit-main:disabled { background: #4b5563; cursor: not-allowed; box-shadow: none; }
+.btn-submit-main:disabled { background: #4b5563; cursor: not-allowed; box-shadow: none; opacity: 0.6; }
 .sync-status-indicator { font-size: 0.82rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px; }
 .status-dot { width: 10px; height: 10px; border-radius: 50%; background-color: var(--accent-green); flex-shrink: 0; }
 .status-dot.syncing { background-color: var(--accent-yellow); animation: pulse 1s infinite; }
@@ -137,6 +136,18 @@ tfoot td.sticky-col-1, tfoot td.sticky-col-2, tfoot td.sticky-col-3 { background
 .badge-category { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; background-color: #312e71; color: #e0e7ff; }
 .col-summary-qty { background-color: rgba(249, 115, 22, 0.1); color: var(--accent-orange); font-weight: bold; }
 .col-summary-amount { background-color: rgba(234, 179, 8, 0.1); color: var(--accent-yellow); font-weight: bold; }
+.banner-notice {
+  background-color: #2d1f14;
+  border: 1px solid var(--accent-orange);
+  color: #fdba74;
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.88rem;
+}
 @media (max-width: 768px) {
   .col-category, th.col-category, td.col-category { display: none !important; }
   .sticky-col-2 { left: 0 !important; min-width: 120px !important; }
@@ -163,24 +174,36 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
 </head>
 <body>
 <div class="container" id="main-container">
+
+    <!-- 訪客/未登入貼心提示 -->
+    <div class="banner-notice" id="login-notice-banner">
+        <span>💡 <strong>瀏覽模式中</strong>：您可隨時切換上方店家瀏覽菜單。如欲點餐或送出，請點擊「Google 登入」或使用「快速訪客模式」。</span>
+        <button class="btn-secondary" onclick="enterGuestMode()">訪客點餐測試</button>
+    </div>
+
     <div class="submit-panel">
         <div class="submit-left">
             <span class="submit-badge">選擇店家</span>
             <select id="store-select" class="select-store" onchange="switchStore()"></select>
+            
             <div id="google-login-container">
-                <div id="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="outline" data-text="signin_with" data-size="large" data-logo_alignment="left"></div>
+                <!-- Google GSI 按鈕容器 -->
+                <div id="g_id_signin"></div>
+                <!-- 備用手動觸發按鈕（防跨域或腳本延遲） -->
+                <button id="btn-manual-login" class="btn-primary" style="display:none;" onclick="triggerGoogleSignIn()">Google 登入</button>
                 <div id="user-info">
                     <img id="user-avatar" src="" alt="avatar">
                     <span id="user-name-display"></span>
                     <button class="btn-secondary" onclick="logout()">登出</button>
                 </div>
             </div>
+            
             <button class="btn-submit-main" id="btn-submit-order" onclick="submitMyOrderToCloud()" disabled>送出我的點餐</button>
             <button class="btn-secondary" onclick="fetchFromGoogleDrive(true)">重新整理</button>
         </div>
         <div class="sync-status-indicator">
             <span class="status-dot" id="status-dot"></span>
-            <span id="sync-status-text">請先登入 Google 帳號以開始點餐</span>
+            <span id="sync-status-text">菜單已就緒，請登入開始點餐</span>
         </div>
     </div>
 
@@ -207,6 +230,7 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
         </div>
     </div>
 
+    <!-- 菜單矩陣表格：無論有無登入均會完整呈現菜單資料 -->
     <div class="table-container">
         <table id="matrix-table">
             <thead>
@@ -214,6 +238,7 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
                     <th class="sticky-col-1 col-category">分類</th>
                     <th class="sticky-col-2">品項名稱</th>
                     <th class="sticky-col-3">單價</th>
+                    <!-- 成員欄位由 JS 動態生成 -->
                     <th class="col-summary-qty">店家劃單總量</th>
                     <th class="col-summary-amount">品項小計</th>
                 </tr>
@@ -224,6 +249,7 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
                     <td class="sticky-col-1 col-category">統計</td>
                     <td class="sticky-col-2">個人應付總計</td>
                     <td class="sticky-col-3">-</td>
+                    <!-- 成員小計欄位由 JS 動態生成 -->
                     <td id="foot-total-qty" class="col-summary-qty">0</td>
                     <td id="foot-total-amount" class="col-summary-amount">NT$ 0</td>
                 </tr>
@@ -232,7 +258,7 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
     </div>
 </div>
 
-<!-- 店家劃單彈窗 (無變更) -->
+<!-- 店家劃單彈窗 -->
 <div class="modal-overlay" id="kitchen-modal">
     <div class="modal-content">
         <div class="modal-header">
@@ -246,7 +272,7 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
     </div>
 </div>
 
-<!-- LINE 分帳明細彈窗 (無變更) -->
+<!-- LINE 分帳明細彈窗 -->
 <div class="modal-overlay" id="share-modal">
     <div class="modal-content">
         <div class="modal-header">
@@ -273,8 +299,11 @@ const _B64_API_TOKEN = "TXlTdVAzclMzY1IzdFQwa0VuMjAyNCE=";
 const GOOGLE_GAS_API_URL = atob(_B64_GAS_URL);
 const API_TOKEN = atob(_B64_API_TOKEN);
 
+// Google Client ID
+const GOOGLE_CLIENT_ID = "332175692979-nkrni08k8fleg7te2uju417rmc207vlv.apps.googleusercontent.com"; 
+
 // ===============================================
-// ======== MENU DATA (菜單資料庫) =================
+// ======== MENU DATA (完整菜單資料庫) ===========
 // ===============================================
 const ALL_MENUS = {
     "lionhead": {
@@ -375,7 +404,7 @@ const ALL_MENUS = {
         data: [
             { id: 'FS01', category: '快餐', name: '排骨飯', price: 100, unit: '份' },
             { id: 'FS02', category: '快餐', name: '焢肉飯', price: 100, unit: '份' },
-            { id: 'FS03', category: '快餐', 'name': '三鮮燴飯', price: 100, unit: '份' },
+            { id: 'FS03', category: '快餐', name: '三鮮燴飯', price: 100, unit: '份' },
             { id: 'FS04', category: '快餐', name: '牛肉燴飯', price: 100, unit: '份' },
             { id: 'FS05', category: '快餐', name: '日式快餐', price: 140, unit: '份' },
             { id: 'FS06', category: '快餐', name: '招牌飯', price: 140, unit: '份' },
@@ -391,7 +420,7 @@ const ALL_MENUS = {
 };
 
 // ===============================================
-// ======== CORE LOGIC (核心程式) ================
+// ======== CORE LOGIC (核心邏輯控制) ============
 // ===============================================
 let MENU_DATA = [];
 let members = [];
@@ -400,7 +429,6 @@ let currentUser = "";
 let currentStoreId = "";
 let isSubmitting = false;
 
-// 價格與金額顯示格式化函數
 function formatPrice(val) {
     if (typeof val !== 'number') val = Number(val);
     if (isNaN(val)) return '0';
@@ -412,6 +440,136 @@ function formatAmount(val) {
     if (isNaN(val)) return '0';
     const rounded = Math.round((val + Number.EPSILON) * 100) / 100;
     return rounded.toLocaleString('zh-TW', { maximumFractionDigits: 2 });
+}
+
+// 初始化 Google Sign-In 按鈕
+function initGoogleSignIn() {
+    try {
+        if (window.google && google.accounts && google.accounts.id) {
+            google.accounts.id.initialize({
+                client_id: GOOGLE_CLIENT_ID,
+                callback: handleCredentialResponse,
+                auto_select: false
+            });
+            
+            const btnContainer = document.getElementById('g_id_signin');
+            if (btnContainer) {
+                google.accounts.id.renderButton(
+                    btnContainer,
+                    { theme: 'outline', size: 'medium', text: 'signin_with', shape: 'pill' }
+                );
+            }
+        } else {
+            showManualLoginOption();
+        }
+    } catch (e) {
+        console.warn("Google SDK 初始化異常，啟用備用按鈕", e);
+        showManualLoginOption();
+    }
+}
+
+function showManualLoginOption() {
+    const manualBtn = document.getElementById('btn-manual-login');
+    if (manualBtn) manualBtn.style.display = 'inline-flex';
+}
+
+function triggerGoogleSignIn() {
+    if (window.google && google.accounts && google.accounts.id) {
+        google.accounts.id.prompt();
+    } else {
+        enterGuestMode();
+    }
+}
+
+// 快速訪客/測試模式
+function enterGuestMode() {
+    const name = prompt("請輸入您的點餐暱稱/姓名：", "同仁A");
+    if (!name || !name.trim()) return;
+    
+    currentUser = name.trim();
+    document.getElementById('g_id_signin').style.display = 'none';
+    document.getElementById('btn-manual-login').style.display = 'none';
+    document.getElementById('user-info').style.display = 'flex';
+    document.getElementById('user-avatar').src = "https://ui-avatars.com/api/?name=" + encodeURIComponent(currentUser) + "&background=3b82f6&color=fff";
+    document.getElementById('user-name-display').innerText = `訪客: ${currentUser}`;
+    document.getElementById('login-notice-banner').style.display = 'none';
+
+    if (!members.includes(currentUser)) {
+        members.push(currentUser);
+        if (!orders[currentUser]) orders[currentUser] = {};
+    }
+    
+    saveLocal();
+    renderTable();
+    calculateAll();
+    updateUserModeUI();
+}
+
+// JWT Token 解析 (免外部龐大依賴)
+function jwt_decode(token) {
+    try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload);
+    } catch (e) {
+        console.error("JWT 解密失敗", e);
+        return null;
+    }
+}
+
+function handleCredentialResponse(response) {
+    const decodedToken = jwt_decode(response.credential);
+    if (!decodedToken) {
+        alert("登入憑證解析失敗，請稍後再試！");
+        return;
+    }
+    
+    currentUser = decodedToken.name || decodedToken.given_name || decodedToken.email.split('@')[0];
+    
+    // UI 更新
+    document.getElementById('g_id_signin').style.display = 'none';
+    document.getElementById('btn-manual-login').style.display = 'none';
+    document.getElementById('user-info').style.display = 'flex';
+    document.getElementById('user-avatar').src = decodedToken.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser)}&background=3b82f6&color=fff`;
+    document.getElementById('user-name-display').innerText = `${currentUser}`;
+    document.getElementById('login-notice-banner').style.display = 'none';
+
+    if (!members.includes(currentUser)) {
+        members.push(currentUser);
+        if (!orders[currentUser]) orders[currentUser] = {};
+    }
+    
+    saveLocal();
+    renderTable();
+    calculateAll();
+    updateUserModeUI();
+    updateStatus("online", `已登入：${currentUser}`);
+}
+
+function logout() {
+    currentUser = "";
+    document.getElementById('g_id_signin').style.display = 'block';
+    document.getElementById('user-info').style.display = 'none';
+    document.getElementById('login-notice-banner').style.display = 'flex';
+    saveLocal();
+    renderTable();
+    calculateAll();
+    updateUserModeUI();
+    updateStatus("offline", "已登出，目前為瀏覽模式");
+}
+
+function updateUserModeUI() {
+    const btnSubmit = document.getElementById('btn-submit-order');
+    if (currentUser) {
+        btnSubmit.disabled = false;
+        btnSubmit.innerText = `送出 ${currentUser} 的點餐`;
+    } else {
+        btnSubmit.disabled = true;
+        btnSubmit.innerText = "請先登入後送出";
+    }
 }
 
 window.onload = function() {
@@ -432,71 +590,24 @@ function init() {
     calculateAll();
     updateBrand();
     updateUserModeUI();
-    initializeGoogleSignIn();
+
+    // 檢查 Google Identity 腳本是否已被載入
+    if (window.google && google.accounts && google.accounts.id) {
+        initGoogleSignIn();
+    } else {
+        setTimeout(initGoogleSignIn, 1200);
+    }
 
     if (GOOGLE_GAS_API_URL && !GOOGLE_GAS_API_URL.includes("YOUR_DEPLOY_ID")) {
         fetchFromGoogleDrive(false);
     } else {
-        updateStatus("offline", "🚫 未填入 Google 網址，目前為單機暫存模式");
+        updateStatus("offline", "未配置後端 API，目前為本地單機模式");
     }
-}
-
-function initializeGoogleSignIn() {
-    google.accounts.id.initialize({
-        client_id: document.querySelector('meta[name="google-signin-client_id"]').content,
-        callback: handleCredentialResponse
-    });
-    google.accounts.id.renderButton(
-        document.getElementById('g_id_signin'),
-        { theme: 'outline', size: 'large' }
-    );
-    // google.accounts.id.prompt(); // Optional: show one-tap login prompt
-}
-
-function handleCredentialResponse(response) {
-    const decodedToken = jwt_decode(response.credential);
-    currentUser = decodedToken.name || decodedToken.given_name || 'Google User';
-    
-    // UI updates
-    document.getElementById('g_id_signin').style.display = 'none';
-    document.getElementById('user-info').style.display = 'flex';
-    document.getElementById('user-avatar').src = decodedToken.picture || '';
-    document.getElementById('user-name-display').innerText = `Hi, ${currentUser}`;
-
-    if (!members.includes(currentUser)) {
-        members.push(currentUser);
-        orders[currentUser] = {};
-    }
-    
-    saveLocal();
-    renderTable();
-    calculateAll();
-    updateUserModeUI();
-}
-
-// Simple JWT decoder
-function jwt_decode(token) {
-    try {
-        return JSON.parse(atob(token.split('.')[1]));
-    } catch (e) {
-        return null;
-    }
-}
-
-function logout() {
-    currentUser = "";
-    document.getElementById('g_id_signin').style.display = 'block';
-    document.getElementById('user-info').style.display = 'none';
-    saveLocal();
-    renderTable();
-    calculateAll();
-    updateUserModeUI();
 }
 
 function loadLocalDataForStore() {
     members = JSON.parse(localStorage.getItem(`menu_order_members_${currentStoreId}`)) || [];
     orders = JSON.parse(localStorage.getItem(`menu_order_orders_${currentStoreId}`)) || {};
-    // currentUser is handled by Google Sign-In, so we don't load it from local storage anymore
     MENU_DATA = ALL_MENUS[currentStoreId] ? ALL_MENUS[currentStoreId].data : [];
 }
 
@@ -525,8 +636,6 @@ function switchStore() {
     if (newStore === currentStoreId) return;
 
     currentStoreId = newStore;
-    
-    // Update URL to reflect the new store selection
     const url = new URL(window.location);
     url.searchParams.set('store', newStore);
     window.history.pushState({}, '', url);
@@ -549,4 +658,372 @@ function updateBrand() {
 }
 
 function updateStatus(type, msg) {
-    const dot = docu
+    const dot = document.getElementById("status-dot");
+    const text = document.getElementById("sync-status-text");
+    dot.className = "status-dot";
+    if (type === "syncing") dot.classList.add("syncing");
+    if (type === "offline") dot.classList.add("offline");
+    text.innerText = msg;
+}
+
+// 核心：繪製整個點餐矩陣與菜單
+function renderTable() {
+    const theadRow = document.getElementById("table-header-row");
+    const tfootRow = document.getElementById("table-foot-row");
+    const tbody = document.getElementById("matrix-tbody");
+
+    // 1. 重設 Header：保留前 3 欄 (分類、品項、單價)
+    while (theadRow.children.length > 3) {
+        theadRow.removeChild(theadRow.children[3]);
+    }
+    
+    // 動態新增所有成員直欄
+    members.forEach(member => {
+        const th = document.createElement("th");
+        th.innerText = member;
+        if (member === currentUser) {
+            th.className = "current-user-col";
+            th.innerText += " (我)";
+        } else {
+            th.className = "readonly-col";
+        }
+        theadRow.appendChild(th);
+    });
+
+    // 補回店家總量、品項小計
+    const thTotalQty = document.createElement("th");
+    thTotalQty.className = "col-summary-qty";
+    thTotalQty.innerText = "店家劃單總量";
+    theadRow.appendChild(thTotalQty);
+
+    const thTotalAmt = document.createElement("th");
+    thTotalAmt.className = "col-summary-amount";
+    thTotalAmt.innerText = "品項小計";
+    theadRow.appendChild(thTotalAmt);
+
+    // 2. 渲染菜單內容 (tbody)
+    tbody.innerHTML = "";
+    MENU_DATA.forEach(item => {
+        const tr = document.createElement("tr");
+
+        // 分類
+        const tdCat = document.createElement("td");
+        tdCat.className = "sticky-col-1 col-category";
+        tdCat.innerHTML = `<span class="badge-category">${item.category}</span>`;
+        tr.appendChild(tdCat);
+
+        // 品項
+        const tdName = document.createElement("td");
+        tdName.className = "sticky-col-2";
+        tdName.innerText = item.name;
+        tr.appendChild(tdName);
+
+        // 單價
+        const tdPrice = document.createElement("td");
+        tdPrice.className = "sticky-col-3";
+        tdPrice.innerText = `$${item.price}`;
+        tr.appendChild(tdPrice);
+
+        // 遍歷所有成員數量
+        members.forEach(member => {
+            const td = document.createElement("td");
+            const userQty = (orders[member] && orders[member][item.id]) ? orders[member][item.id] : 0;
+
+            if (member === currentUser) {
+                td.className = "current-user-col";
+                td.innerHTML = `
+                    <div class="qty-control">
+                        <button class="qty-btn" onclick="updateQty('${item.id}', -1)">-</button>
+                        <input class="qty-input" type="text" id="qty_${item.id}" value="${userQty}" readonly>
+                        <button class="qty-btn" onclick="updateQty('${item.id}', 1)">+</button>
+                    </div>
+                `;
+            } else {
+                td.className = "readonly-col";
+                td.innerHTML = `<span class="readonly-val ${userQty > 0 ? 'has-qty' : 'zero'}">${userQty}</span>`;
+            }
+            tr.appendChild(td);
+        });
+
+        // 總量欄
+        const tdItemTotalQty = document.createElement("td");
+        tdItemTotalQty.id = `item_total_qty_${item.id}`;
+        tdItemTotalQty.className = "col-summary-qty";
+        tdItemTotalQty.innerText = "0";
+        tr.appendChild(tdItemTotalQty);
+
+        // 小計欄
+        const tdItemTotalAmt = document.createElement("td");
+        tdItemTotalAmt.id = `item_total_amt_${item.id}`;
+        tdItemTotalAmt.className = "col-summary-amount";
+        tdItemTotalAmt.innerText = "NT$ 0";
+        tr.appendChild(tdItemTotalAmt);
+
+        tbody.appendChild(tr);
+    });
+
+    // 3. 重設 Footer
+    while (tfootRow.children.length > 3) {
+        tfootRow.removeChild(tfootRow.children[3]);
+    }
+    members.forEach(member => {
+        const td = document.createElement("td");
+        td.id = `member_subtotal_${encodeURIComponent(member)}`;
+        if (member === currentUser) td.className = "current-user-col";
+        td.innerText = "NT$ 0";
+        tfootRow.appendChild(td);
+    });
+
+    const tdFootTotalQty = document.createElement("td");
+    tdFootTotalQty.id = "foot-total-qty";
+    tdFootTotalQty.className = "col-summary-qty";
+    tdFootTotalQty.innerText = "0";
+    tfootRow.appendChild(tdFootTotalQty);
+
+    const tdFootTotalAmt = document.createElement("td");
+    tdFootTotalAmt.id = "foot-total-amount";
+    tdFootTotalAmt.className = "col-summary-amount";
+    tdFootTotalAmt.innerText = "NT$ 0";
+    tfootRow.appendChild(tdFootTotalAmt);
+}
+
+// 數量增減處理
+function updateQty(itemId, delta) {
+    if (!currentUser) {
+        alert("請先完成登入或使用訪客模式再點餐！");
+        return;
+    }
+    if (!orders[currentUser]) orders[currentUser] = {};
+    let currentVal = Number(orders[currentUser][itemId] || 0);
+    currentVal = Math.max(0, currentVal + delta);
+    
+    if (currentVal === 0) {
+        delete orders[currentUser][itemId];
+    } else {
+        orders[currentUser][itemId] = currentVal;
+    }
+
+    const inputElem = document.getElementById(`qty_${itemId}`);
+    if (inputElem) inputElem.value = currentVal;
+
+    saveLocal();
+    calculateAll();
+}
+
+// 統計全體金額與劃單數據
+function calculateAll() {
+    let grandTotalQty = 0;
+    let grandTotalAmount = 0;
+    const memberTotals = {};
+    members.forEach(m => memberTotals[m] = { qty: 0, amount: 0 });
+
+    MENU_DATA.forEach(item => {
+        let itemQty = 0;
+        members.forEach(m => {
+            const q = (orders[m] && orders[m][item.id]) ? Number(orders[m][item.id]) : 0;
+            itemQty += q;
+            memberTotals[m].qty += q;
+            memberTotals[m].amount += q * item.price;
+        });
+
+        const itemSubtotal = itemQty * item.price;
+        grandTotalQty += itemQty;
+        grandTotalAmount += itemSubtotal;
+
+        const elQty = document.getElementById(`item_total_qty_${item.id}`);
+        const elAmt = document.getElementById(`item_total_amt_${item.id}`);
+        if (elQty) elQty.innerText = itemQty;
+        if (elAmt) elAmt.innerText = `NT$ ${formatAmount(itemSubtotal)}`;
+    });
+
+    // 填寫 Footer 各成員應付總計
+    members.forEach(m => {
+        const td = document.getElementById(`member_subtotal_${encodeURIComponent(m)}`);
+        if (td) td.innerText = `NT$ ${formatAmount(memberTotals[m].amount)}`;
+    });
+
+    // 底部全單總計
+    const elFootQty = document.getElementById("foot-total-qty");
+    const elFootAmt = document.getElementById("foot-total-amount");
+    if (elFootQty) elFootQty.innerText = grandTotalQty;
+    if (elFootAmt) elFootAmt.innerText = `NT$ ${formatAmount(grandTotalAmount)}`;
+
+    // 頂部統計面板
+    document.getElementById("grand-total-amount").innerText = `NT$ ${formatAmount(grandTotalAmount)}`;
+    document.getElementById("grand-total-qty").innerText = `${grandTotalQty} 份`;
+    document.getElementById("total-members-count").innerText = `${members.length} 人`;
+}
+
+// 清空個人點餐
+function clearMyOrder() {
+    if (!currentUser) return;
+    if (confirm(`確定要清空 ${currentUser} 在此店家的所有餐點數量嗎？`)) {
+        orders[currentUser] = {};
+        saveLocal();
+        renderTable();
+        calculateAll();
+    }
+}
+
+// 與 Google Apps Script (雲端試算表) 批次同步
+async function fetchFromGoogleDrive(isManual = false) {
+    if (!GOOGLE_GAS_API_URL) return;
+    updateStatus("syncing", "正在從雲端試算表讀取最新點餐...");
+    try {
+        const resp = await fetch(`${GOOGLE_GAS_API_URL}?storeId=${currentStoreId}&token=${encodeURIComponent(API_TOKEN)}`);
+        const resJson = await resp.json();
+        if (resJson.status === "success") {
+            const data = resJson.data;
+            members = data.members || [];
+            orders = data.orders || {};
+
+            // 若目前已登入的使用者不在清單中，自動加回
+            if (currentUser && !members.includes(currentUser)) {
+                members.push(currentUser);
+                if (!orders[currentUser]) orders[currentUser] = {};
+            }
+
+            saveLocal();
+            renderTable();
+            calculateAll();
+            updateStatus("online", `同步成功 (${new Date().toLocaleTimeString('zh-TW')})`);
+        } else {
+            throw new Error(resJson.message);
+        }
+    } catch (err) {
+        console.error(err);
+        updateStatus("offline", "雲端讀取失敗，使用本地暫存");
+        if (isManual) alert("雲端讀取失敗：" + err.message);
+    }
+}
+
+// 送出點餐至雲端後端
+async function submitMyOrderToCloud() {
+    if (!currentUser) {
+        alert("請先登入後再送出！");
+        return;
+    }
+    if (isSubmitting) return;
+
+    isSubmitting = true;
+    updateStatus("syncing", "正在寫入雲端試算表...");
+    const btnSubmit = document.getElementById("btn-submit-order");
+    btnSubmit.disabled = true;
+
+    try {
+        const payload = {
+            token: API_TOKEN,
+            action: "update_member",
+            storeId: currentStoreId,
+            storeName: ALL_MENUS[currentStoreId]?.name || currentStoreId,
+            targetMember: currentUser,
+            memberOrders: orders[currentUser] || {},
+            menuSummary: MENU_DATA.map(i => ({ id: i.id, category: i.category, name: i.name, price: i.price }))
+        };
+
+        const resp = await fetch(GOOGLE_GAS_API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(payload)
+        });
+
+        const resJson = await resp.json();
+        if (resJson.status === "success") {
+            updateStatus("online", "訂單已成功儲存至 Google 試算表！");
+            alert(`🎉 恭喜！${currentUser} 的點餐已送達 Google Sheets！`);
+            await fetchFromGoogleDrive(false);
+        } else {
+            throw new Error(resJson.message);
+        }
+    } catch (err) {
+        console.error(err);
+        updateStatus("offline", "送出失敗：" + err.message);
+        alert("送出失敗：" + err.message);
+    } finally {
+        isSubmitting = false;
+        btnSubmit.disabled = false;
+    }
+}
+
+// 彈窗模組
+function closeModal(id) {
+    document.getElementById(id).style.display = 'none';
+}
+
+function openKitchenModal() {
+    const listBody = document.getElementById("kitchen-list-body");
+    listBody.innerHTML = "";
+    
+    let hasItems = false;
+    MENU_DATA.forEach(item => {
+        let count = 0;
+        members.forEach(m => {
+            count += (orders[m] && orders[m][item.id]) ? Number(orders[m][item.id]) : 0;
+        });
+
+        if (count > 0) {
+            hasItems = true;
+            const chip = document.createElement("div");
+            chip.className = "order-item-chip";
+            chip.innerHTML = `
+                <span><strong>[${item.category}]</strong> ${item.name}</span>
+                <span style="color: var(--accent-orange); font-weight: bold;">${count} ${item.unit || '份'}</span>
+            `;
+            listBody.appendChild(chip);
+        }
+    });
+
+    if (!hasItems) {
+        listBody.innerHTML = "<div style='text-align:center; padding: 20px; color: var(--text-muted);'>目前無任何人點餐！</div>";
+    }
+
+    document.getElementById("kitchen-modal").style.display = "flex";
+}
+
+function openShareModal() {
+    const storeInfo = ALL_MENUS[currentStoreId] || { name: "點餐" };
+    let text = `🍱【${storeInfo.name} 點餐收費名單】\n`;
+    text += `📅 統計時間：${new Date().toLocaleDateString('zh-TW')} ${new Date().toLocaleTimeString('zh-TW', {hour: '2-digit', minute:'2-digit'})}\n`;
+    text += `------------------------------------\n`;
+
+    let grandAmount = 0;
+    let grandQty = 0;
+
+    members.forEach(m => {
+        let mTotal = 0;
+        let mItems = [];
+        MENU_DATA.forEach(item => {
+            const q = (orders[m] && orders[m][item.id]) ? Number(orders[m][item.id]) : 0;
+            if (q > 0) {
+                mTotal += q * item.price;
+                mItems.push(`${item.name} x${q}`);
+            }
+        });
+
+        if (mItems.length > 0) {
+            grandAmount += mTotal;
+            text += `👤 ${m}：$${mTotal}\n   明細：${mItems.join(", ")}\n`;
+        }
+    });
+
+    text += `------------------------------------\n`;
+    text += `💰 全單總應收：NT$ ${grandAmount}\n`;
+    text += `請大家備好零錢或透過 LINE Pay 轉帳，謝謝！`;
+
+    document.getElementById("share-text-area").value = text;
+    document.getElementById("share-modal").style.display = "flex";
+}
+
+function copyShareText() {
+    const area = document.getElementById("share-text-area");
+    area.select();
+    navigator.clipboard.writeText(area.value).then(() => {
+        alert("已成功複製 LINE 明細至剪貼簿！");
+    }).catch(() => {
+        document.execCommand("copy");
+        alert("已複製到剪貼簿！");
+    });
+}
+</script>
+</body>
+</html>
