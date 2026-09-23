@@ -275,7 +275,6 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
                     <th class="sticky-col-1 col-category">分類</th>
                     <th class="sticky-col-2">品項名稱</th>
                     <th class="sticky-col-3">單價</th>
-                    <!-- 成員欄位由 JS 動態生成 -->
                     <th class="col-summary-qty">店家劃單總量</th>
                     <th class="col-summary-amount">品項小計</th>
                 </tr>
@@ -286,7 +285,6 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
                     <td class="sticky-col-1 col-category">統計</td>
                     <td class="sticky-col-2">個人應付總計</td>
                     <td class="sticky-col-3">-</td>
-                    <!-- 成員小計欄位由 JS 動態生成 -->
                     <td id="foot-total-qty" class="col-summary-qty">0</td>
                     <td id="foot-total-amount" class="col-summary-amount">NT$ 0</td>
                 </tr>
@@ -328,149 +326,37 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
 
 <script>
 // ===================================================================
-// ======== CONFIGURATION (密鑰 混淆版) =========================
+// ======== CONFIGURATION (請務必修改此區) =======================
 // ===================================================================
-// !!! 重要：請將此處替換為您自己的 Google Apps Script 部署 URL !!!
+// 1. 您的 Google Apps Script 部署 URL (Base64 編碼)
+//    範例：atob("aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3Mvcy9YWFhYL2V4ZWM=")
 const _B64_GAS_URL = "aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3Mvcy9BS2Z5Y2J3LTVQX04xWVJxMlB5c3Q2cUw2LXRpNkp4VFE5dmNHMFN6aWZYMXdQRmdsazUwRXZvRVFTaTlYeFNkcEdyUG82M0QvZXhlYw==";
+
+// 2. 您的 API Token (Base64 編碼)，必須與後端 gs code.txt 中的 API_TOKEN 一致
 const _B64_API_TOKEN = "TXlTdVAzclMzY1IzdFQwa0VuMjAyNCE=";
 
-const GOOGLE_GAS_API_URL = atob(_B64_GAS_URL);
-const API_TOKEN = atob(_B64_API_TOKEN);
-
-// !!! 重要：請將此處替換為您在 Google Cloud Console 申請的 Client ID !!!
+// 3. 您在 Google Cloud Console 申請的 OAuth 2.0 Client ID
 const GOOGLE_CLIENT_ID = "332175692979-nkrni08k8fleg7te2uju417rmc207vlv.apps.googleusercontent.com"; 
 
-// 管理員 Email 列表
+// 4. 管理員 Email 列表
 const ADMIN_ACCOUNTS = ["jim.hsu@infotimes.com.tw", "roye.tu@infotimes.com.tw"];
 
-// ===============================================
-// ======== MENU DATA (完整菜單資料庫) ===========
-// ===============================================
-const ALL_MENUS = {
-    "lionhead": {
-        name: "獅子頭雞肉飯",
-        data: [
-            { id: 'LH01', category: '主餐', name: '獅子頭雞肉飯', price: 165, unit: '份' },
-            { id: 'LH02', category: '主餐', name: '獅子頭雞肉飯(無配菜)', price: 145, unit: '份' },
-            { id: 'LH03', category: '主餐', name: '雙倍雞肉飯', price: 200, unit: '份' },
-            { id: 'LH04', category: '主餐', name: '雙倍雞肉飯(無配菜)', price: 180, unit: '份' },
-            { id: 'LH05', category: '主餐', name: '好吃雞肉飯', price: 125, unit: '份' },
-            { id: 'LH06', category: '主餐', name: '好吃雞肉飯(無配菜)', price: 105, unit: '份' },
-            { id: 'LH07', category: '主餐', name: '獅子頭飯', price: 125, unit: '份' },
-            { id: 'LH08', category: '主餐', name: '獅子頭飯(無配菜)', price: 105, unit: '份' },
-            { id: 'LH09', category: '主餐', name: '咖哩雞肉飯', price: 145, unit: '份' },
-            { id: 'LH10', category: '主餐', name: '咖哩雞肉飯(無配菜)', price: 125, unit: '份' },
-            { id: 'LH11', category: '主餐', name: '咖哩獅子頭飯', price: 145, unit: '份' },
-            { id: 'LH12', category: '主餐', name: '咖哩獅子頭飯(無配菜)', price: 125, unit: '份' },
-            { id: 'LH13', category: '主餐', name: '咖哩醬飯', price: 85, unit: '份' },
-            { id: 'LH14', category: '主餐', name: '咖哩醬飯(無配菜)', price: 65, unit: '份' },
-            { id: 'LH15', category: '單點', name: '好吃雞肉(份)', price: 90, unit: '份' },
-            { id: 'LH16', category: '單點', name: '獅子頭(顆)', price: 43, unit: '顆' },
-            { id: 'LH17', category: '單點', name: '炒時蔬', price: 40, unit: '份' },
-            { id: 'LH18', category: '單點', name: '水煮蛋', price: 20, unit: '顆' },
-            { id: 'LH19', category: '單點', name: '白飯', price: 15, unit: '碗' },
-            { id: 'LH20', category: '熱湯', name: '貢丸湯', price: 35, unit: '碗' },
-            { id: 'LH21', category: '熱湯', name: '魚丸湯', price: 35, unit: '碗' },
-            { id: 'LH22', category: '熱湯', name: '綜合丸湯', price: 35, unit: '碗' },
-            { id: 'LH23', category: '果漾果醋', name: '蘋果口味', price: 49, unit: '瓶' },
-            { id: 'LH24', category: '果漾果醋', name: '葡萄口味', price: 49, unit: '瓶' }
-        ]
-    },
-    "shike": {
-        name: "食客燒臘坊",
-        data: [
-            { id: 'SK01', category: '美味便當', name: '蔬食餐盒', price: 70, unit: '份' },
-            { id: 'SK02', category: '美味便當', name: '蜜汁香腸飯', price: 100, unit: '份' },
-            { id: 'SK03', category: '美味便當', name: '玫瑰油雞飯', price: 100, unit: '份' },
-            { id: 'SK04', category: '美味便當', name: '明爐燒鴨飯', price: 110, unit: '份' },
-            { id: 'SK05', category: '美味便當', name: '蜜汁叉燒飯', price: 110, unit: '份' },
-            { id: 'SK06', category: '美味便當', name: '羊城脆皮燒肉飯', price: 110, unit: '份' },
-            { id: 'SK07', category: '美味便當', name: '脆皮燒肉飯', price: 120, unit: '份' },
-            { id: 'SK08', category: '美味便當', name: '肥濃叉燒飯', price: 120, unit: '份' },
-            { id: 'SK09', category: '美味便當', name: '蜜汁雞腿飯', price: 130, unit: '份' },
-            { id: 'SK10', category: '美味便當', name: '玫瑰雞腿飯', price: 130, unit: '份' },
-            { id: 'SK11', category: '美味便當', name: '脆皮鴨腿飯', price: 150, unit: '份' },
-            { id: 'SK12', category: '美味便當', name: '食客雙拼飯', price: 120, unit: '份' },
-            { id: 'SK13', category: '美味便當', name: '食客三寶飯', price: 130, unit: '份' },
-            { id: 'SK14', category: '美味便當', name: '食客招牌飯', price: 150, unit: '份' },
-            { id: 'SK15', category: '單點美食', name: '香腸', price: 30, unit: '份' },
-            { id: 'SK16', category: '單點美食', name: '叉燒', price: 40, unit: '兩' },
-            { id: 'SK17', category: '單點美食', name: '臘腸', price: 70, unit: '條' },
-            { id: 'SK18', category: '單點美食', name: '玫瑰雞腿', price: 100, unit: '隻' },
-            { id: 'SK19', category: '單點美食', name: '玫瑰油雞', price: 620, unit: '全隻' },
-            { id: 'SK20', category: '單點美食', name: '玫瑰油雞', price: 350, unit: '半隻' },
-            { id: 'SK21', category: '單點美食', name: '烤鴨', price: 40, unit: '兩' },
-            { id: 'SK22', category: '單點美食', name: '燒肉', price: 40, unit: '兩' },
-            { id: 'SK23', category: '單點美食', name: '肝腸', price: 70, unit: '條' },
-            { id: 'SK24', category: '單點美食', name: '玫瑰雞(分兩/隻)', price: 80, unit: '份' },
-            { id: 'SK25', category: '單點美食', name: '香烤雞腿(分兩/隻)', price: 80, unit: '份' },
-            { id: 'SK26', category: '櫻桃烤鴨', name: '一隻', price: 1000, unit: '隻' },
-            { id: 'SK27', category: '櫻桃烤鴨', name: '半隻', price: 550, unit: '份' },
-            { id: 'SK28', category: '櫻桃烤鴨', name: '脆皮烤鴨 1/4(上庄)', price: 250, unit: '份' },
-            { id: 'SK29', category: '櫻桃烤鴨', name: '脆皮烤鴨 1/4(下庄)', price: 300, unit: '份' },
-            { id: 'SK30', category: '鴻運燒味拼', name: '雙拼盤', price: 160, unit: '份' },
-            { id: 'SK31', category: '鴻運燒味拼', name: '三拼盤', price: 320, unit: '份' },
-            { id: 'SK32', category: '鴻運燒味拼', name: '四拼盤', price: 420, unit: '份' },
-            { id: 'SK33', category: '鴻運燒味拼', name: '五福拼', price: 520, unit: '份' }
-        ]
-    },
-    "jiudai": {
-        name: "九代排骨",
-        data: [
-            { id: 'JD01', category: '飯類', name: '招牌魯肉飯(小)', price: 35, unit: '碗' },
-            { id: 'JD02', category: '飯類', name: '招牌魯肉飯(大)', price: 55, unit: '碗' },
-            { id: 'JD03', category: '飯類', name: '魯排骨飯', price: 100, unit: '份' },
-            { id: 'JD04', category: '飯類', name: '蒜泥白肉飯', price: 100, unit: '份' },
-            { id: 'JD05', category: '飯類', name: '炸排骨飯', price: 100, unit: '份' },
-            { id: 'JD06', category: '飯類', name: '炸燒肉飯', price: 100, unit: '份' },
-            { id: 'JD07', 'category': '飯類', name: '黃金蝦卷飯', price: 100, unit: '份' },
-            { id: 'JD08', 'category': '飯類', name: '祖傳焢肉飯', price: 110, unit: '份' },
-            { id: 'JD09', 'category': '飯類', name: '現炸雞排飯', price: 110, unit: '份' },
-            { id: 'JD10', category: '飯類', name: '雙拼便當', price: 120, unit: '份' },
-            { id: 'JD11', category: '飯類', name: '魯肉便當', price: 80, unit: '份' },
-            { id: 'JD12', category: '單點', name: '現炸排骨', price: 70, unit: '份' },
-            { id: 'JD13', category: '單點', name: '現炸燒肉', price: 70, unit: '份' },
-            { id: 'JD14', category: '單點', name: '黃金蝦卷', price: 70, unit: '份' },
-            { id: 'JD15', category: '單點', name: '蒜泥白肉', price: 70, unit: '份' },
-            { id: 'JD16', category: '單點', name: '祖傳焢肉', price: 80, unit: '份' },
-            { id: 'JD17', category: '單點', name: '現炸雞排', price: 80, unit: '份' },
-            { id: 'JD18', category: '單點', name: '炸豆腐', price: 40, unit: '份' },
-            { id: 'JD19', category: '單點', name: '皮蛋豆腐', price: 40, unit: '份' },
-            { id: 'JD20', category: '單點', name: '炸牛蒡甜不辣', price: 40, unit: '份' },
-            { id: 'JD21', category: '單點', name: '荷包蛋', price: 15, unit: '顆' }
-        ]
-    },
-    "fongsheng": {
-        name: "豐盛快餐",
-        data: [
-            { id: 'FS01', category: '快餐', name: '排骨飯', price: 100, unit: '份' },
-            { id: 'FS02', category: '快餐', name: '焢肉飯', price: 100, unit: '份' },
-            { id: 'FS03', category: '快餐', name: '三鮮燴飯', price: 100, unit: '份' },
-            { id: 'FS04', category: '快餐', name: '牛肉燴飯', price: 100, unit: '份' },
-            { id: 'FS05', category: '快餐', name: '日式快餐', price: 140, unit: '份' },
-            { id: 'FS06', category: '快餐', name: '招牌飯', price: 140, unit: '份' },
-            { id: 'FS07', category: '快餐', name: '嫩薑牛肉飯', price: 140, unit: '份' },
-            { id: 'FS08', category: '快餐', name: '豆豉旗魚飯', price: 140, unit: '份' },
-            { id: 'FS09', category: '快餐', name: '蔥爆豬肉飯', price: 140, unit: '份' },
-            { id: 'FS10', category: '快餐', name: '蔥爆雞腿肉飯', price: 140, unit: '份' },
-            { id: 'FS11', category: '快餐', name: '雞中寶飯', price: 130, unit: '份' },
-            { id: 'FS12', category: '快餐', name: '滿意快餐', price: 150, unit: '份' },
-            { id: 'FS13', category: '快餐', name: '義式快餐', price: 170, unit: '份' }
-        ]
-    }
-};
+// --- 以下為系統核心邏輯，通常不需修改 ---
+const GOOGLE_GAS_API_URL = atob(_B64_GAS_URL);
+const API_TOKEN = atob(_B64_API_TOKEN);
 
 // ===============================================
 // ======== CORE LOGIC (核心邏輯控制) ============
 // ===============================================
+let ALL_STORES = {};
 let MENU_DATA = [];
 let members = [];
 let orders = {};
 let currentUser = "";
-let currentUserEmail = ""; // 新增，儲存登入者 Email
+let currentUserEmail = "";
 let currentStoreId = "";
 let isSubmitting = false;
-let isMenuLocked = false; // 新增，標記菜單是否鎖定
+let isMenuLocked = false;
 
 function formatPrice(val) {
     if (typeof val !== 'number') val = Number(val);
@@ -485,7 +371,76 @@ function formatAmount(val) {
     return rounded.toLocaleString('zh-TW', { maximumFractionDigits: 2 });
 }
 
-// 初始化 Google Sign-In 按鈕
+function jwt_decode(token) {
+    try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload);
+    } catch (e) {
+        console.error("JWT 解密失敗", e);
+        return null;
+    }
+}
+
+window.onload = async function() {
+    updateStatus("syncing", "正在取得店家列表...");
+    try {
+        await loadStoreList();
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const storeFromUrl = urlParams.get('store');
+
+        currentStoreId = storeFromUrl && ALL_STORES[storeFromUrl] 
+            ? storeFromUrl 
+            : localStorage.getItem("menu_order_current_store") || Object.keys(ALL_STORES)[0];
+        
+        if (!currentStoreId) {
+             updateStatus("offline", "錯誤：找不到任何店家。請確認 Google Sheet 中有名為 'MENU_xxx' 的分頁。");
+             alert("錯誤：找不到任何店家。請確認 Google Sheet 中有名為 'MENU_xxx' 的分頁。");
+             return;
+        }
+        
+        init();
+
+    } catch (error) {
+        console.error("初始化失敗:", error);
+        updateStatus("offline", "初始化失敗：" + error.message);
+        alert("頁面初始化失敗：" + error.message);
+    }
+};
+
+async function loadStoreList() {
+    if (!GOOGLE_GAS_API_URL || GOOGLE_GAS_API_URL.includes("YOUR_DEPLOY_ID")) {
+        throw new Error("後端 API 未設定。");
+    }
+    const resp = await fetch(`${GOOGLE_GAS_API_URL}?action=get_stores&token=${encodeURIComponent(API_TOKEN)}`);
+    const resJson = await resp.json();
+    if (resJson.status === "success") {
+        ALL_STORES = resJson.data;
+    } else {
+        throw new Error("取得店家列表失敗：" + resJson.message);
+    }
+}
+
+function init() {
+    renderStoreSelect();
+    loadLocalDataForStore();
+    renderTable(); 
+    calculateAll();
+    updateBrand();
+    updateUserModeUI();
+
+    if (window.google && google.accounts && google.accounts.id) {
+        initGoogleSignIn();
+    } else {
+        setTimeout(initGoogleSignIn, 1200);
+    }
+    fetchFromGoogleDrive(false); 
+}
+
 function initGoogleSignIn() {
     try {
         if (window.google && google.accounts && google.accounts.id) {
@@ -497,16 +452,13 @@ function initGoogleSignIn() {
             
             const btnContainer = document.getElementById('g_id_signin');
             if (btnContainer) {
-                google.accounts.id.renderButton(
-                    btnContainer,
-                    { theme: 'outline', size: 'medium', text: 'signin_with', shape: 'pill' }
-                );
+                google.accounts.id.renderButton(btnContainer, { theme: 'outline', size: 'medium', text: 'signin_with', shape: 'pill' });
             }
         } else {
             showManualLoginOption();
         }
     } catch (e) {
-        console.warn("Google SDK 初始化異常，啟用備用按鈕", e);
+        console.warn("Google SDK 初始化異常", e);
         showManualLoginOption();
     }
 }
@@ -524,13 +476,41 @@ function triggerGoogleSignIn() {
     }
 }
 
-// 快速訪客/測試模式
+function handleCredentialResponse(response) {
+    const decodedToken = jwt_decode(response.credential);
+    if (!decodedToken) {
+        alert("登入憑證解析失敗!");
+        return;
+    }
+    currentUser = decodedToken.name || decodedToken.given_name || decodedToken.email.split('@')[0];
+    currentUserEmail = decodedToken.email;
+    
+    document.getElementById('g_id_signin').style.display = 'none';
+    document.getElementById('btn-manual-login').style.display = 'none';
+    document.getElementById('user-info').style.display = 'flex';
+    document.getElementById('user-avatar').src = decodedToken.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser)}&background=3b82f6&color=fff`;
+    document.getElementById('user-name-display').innerText = `${currentUser}`;
+    document.getElementById('login-notice-banner').style.display = 'none';
+
+    if (!members.includes(currentUser)) {
+        members.push(currentUser);
+        if (!orders[currentUser]) orders[currentUser] = {};
+    }
+    
+    saveLocal();
+    renderTable();
+    calculateAll();
+    updateUserModeUI();
+    updateStatus("online", `已登入：${currentUser}`);
+    checkAdminStatus();
+}
+
 function enterGuestMode() {
-    const name = prompt("請輸入您的點餐暱稱/姓名：", "同仁A");
+    const name = prompt("請輸入您的點餐暱稱/姓名：", "訪客");
     if (!name || !name.trim()) return;
     
     currentUser = name.trim();
-    currentUserEmail = ""; // 訪客模式沒有 email
+    currentUserEmail = "";
     document.getElementById('g_id_signin').style.display = 'none';
     document.getElementById('btn-manual-login').style.display = 'none';
     document.getElementById('user-info').style.display = 'flex';
@@ -550,61 +530,14 @@ function enterGuestMode() {
     checkAdminStatus();
 }
 
-// JWT Token 解析 (免外部龐大依賴)
-function jwt_decode(token) {
-    try {
-        const base64Url = token.split('.')[1];
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        }).join(''));
-        return JSON.parse(jsonPayload);
-    } catch (e) {
-        console.error("JWT 解密失敗", e);
-        return null;
-    }
-}
-
-function handleCredentialResponse(response) {
-    const decodedToken = jwt_decode(response.credential);
-    if (!decodedToken) {
-        alert("登入憑證解析失敗，請稍後再試！");
-        return;
-    }
-    
-    currentUser = decodedToken.name || decodedToken.given_name || decodedToken.email.split('@')[0];
-    currentUserEmail = decodedToken.email; // 儲存 Email
-    
-    // UI 更新
-    document.getElementById('g_id_signin').style.display = 'none';
-    document.getElementById('btn-manual-login').style.display = 'none';
-    document.getElementById('user-info').style.display = 'flex';
-    document.getElementById('user-avatar').src = decodedToken.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser)}&background=3b82f6&color=fff`;
-    document.getElementById('user-name-display').innerText = `${currentUser}`;
-    document.getElementById('login-notice-banner').style.display = 'none';
-
-    if (!members.includes(currentUser)) {
-        members.push(currentUser);
-        if (!orders[currentUser]) orders[currentUser] = {};
-    }
-    
-    saveLocal();
-    renderTable();
-    calculateAll();
-    updateUserModeUI();
-    updateStatus("online", `已登入：${currentUser}`);
-    
-    // 檢查管理員身份
-    checkAdminStatus();
-}
-
 function logout() {
     currentUser = "";
-    currentUserEmail = ""; // 登出時清空
+    currentUserEmail = "";
     document.getElementById('g_id_signin').style.display = 'block';
     document.getElementById('user-info').style.display = 'none';
     document.getElementById('login-notice-banner').style.display = 'flex';
-    document.getElementById('admin-controls-panel').style.display = 'none'; // 隱藏管理員面板
+    document.getElementById('admin-controls-panel').style.display = 'none';
+    
     saveLocal();
     renderTable();
     calculateAll();
@@ -612,11 +545,69 @@ function logout() {
     updateStatus("offline", "已登出，目前為瀏覽模式");
 }
 
+function loadLocalDataForStore() {
+    members = JSON.parse(localStorage.getItem(`menu_order_members_${currentStoreId}`)) || [];
+    orders = JSON.parse(localStorage.getItem(`menu_order_orders_${currentStoreId}`)) || {};
+}
+
+function saveLocal() {
+    localStorage.setItem(`menu_order_members_${currentStoreId}`, JSON.stringify(members));
+    localStorage.setItem(`menu_order_orders_${currentStoreId}`, JSON.stringify(orders));
+    localStorage.setItem("menu_order_current_store", currentStoreId);
+}
+
+function switchStore() {
+    const newStore = document.getElementById("store-select").value;
+    if (newStore === currentStoreId) return;
+
+    currentStoreId = newStore;
+    const url = new URL(window.location);
+    url.searchParams.set('store', newStore);
+    window.history.pushState({}, '', url);
+
+    MENU_DATA = [];
+    members = [];
+    orders = {};
+    
+    renderTable();
+    updateBrand();
+    
+    fetchFromGoogleDrive(false);
+}
+
+function renderStoreSelect() {
+    const select = document.getElementById("store-select");
+    select.innerHTML = "";
+    for (const storeId in ALL_STORES) {
+        const opt = document.createElement("option");
+        opt.value = storeId;
+        opt.innerText = ALL_STORES[storeId].name;
+        if (storeId === currentStoreId) {
+            opt.selected = true;
+        }
+        select.appendChild(opt);
+    }
+}
+
+function updateBrand() {
+    const storeInfo = ALL_STORES[currentStoreId] || { name: "載入中..." };
+    document.getElementById('store-brand-badge').innerText = storeInfo.name.substring(0, 2);
+    document.getElementById('store-title').innerText = `${storeInfo.name} - 多人點餐統計`;
+}
+
+function updateStatus(type, msg) {
+    const dot = document.getElementById("status-dot");
+    const text = document.getElementById("sync-status-text");
+    dot.className = "status-dot";
+    if (type === "syncing") dot.classList.add("syncing");
+    if (type === "offline") dot.classList.add("offline");
+    text.innerText = msg;
+}
+
 function checkAdminStatus() {
     const adminPanel = document.getElementById('admin-controls-panel');
     if (currentUserEmail && ADMIN_ACCOUNTS.includes(currentUserEmail)) {
         adminPanel.style.display = 'flex';
-        // 根據鎖定狀態顯示不同按鈕
         document.getElementById('btn-admin-lock').style.display = isMenuLocked ? 'none' : 'inline-flex';
         document.getElementById('btn-admin-unlock').style.display = isMenuLocked ? 'inline-flex' : 'none';
     } else {
@@ -643,97 +634,48 @@ function updateUserModeUI() {
     }
 }
 
-window.onload = function() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const storeFromUrl = urlParams.get('store');
+async function fetchFromGoogleDrive(isManual = false) {
+    if (!GOOGLE_GAS_API_URL) return;
+    updateStatus("syncing", "正在從雲端讀取最新資料...");
+    try {
+        const resp = await fetch(`${GOOGLE_GAS_API_URL}?storeId=${currentStoreId}&token=${encodeURIComponent(API_TOKEN)}`);
+        const resJson = await resp.json();
 
-    currentStoreId = storeFromUrl && ALL_MENUS[storeFromUrl] 
-        ? storeFromUrl 
-        : localStorage.getItem("menu_order_current_store") || Object.keys(ALL_MENUS)[0];
+        if (resJson.status === "success") {
+            const data = resJson.data;
 
-    init();
-};
+            if (data.warning) {
+                console.warn(data.warning);
+                alert(data.warning);
+            }
+            
+            members = data.members || [];
+            orders = data.orders || {};
+            isMenuLocked = data.isLocked || false;
+            MENU_DATA = data.menuData || [];
 
-function init() {
-    renderStoreSelect();
-    loadLocalDataForStore();
-    renderTable();
-    calculateAll();
-    updateBrand();
-    updateUserModeUI();
+            document.getElementById('locked-notice-banner').style.display = isMenuLocked ? 'block' : 'none';
 
-    if (window.google && google.accounts && google.accounts.id) {
-        initGoogleSignIn();
-    } else {
-        setTimeout(initGoogleSignIn, 1200);
-    }
+            if (currentUser && !members.includes(currentUser)) {
+                members.push(currentUser);
+                if (!orders[currentUser]) orders[currentUser] = {};
+            }
 
-    if (GOOGLE_GAS_API_URL && !GOOGLE_GAS_API_URL.includes("YOUR_DEPLOY_ID")) {
-        fetchFromGoogleDrive(false);
-    } else {
-        updateStatus("offline", "未配置後端 API，目前為本地單機模式");
-    }
-}
+            saveLocal();
+            renderTable();
+            calculateAll();
+            updateUserModeUI();
+            checkAdminStatus();
+            updateStatus("online", `同步成功 (${new Date().toLocaleTimeString('zh-TW')})`);
 
-function loadLocalDataForStore() {
-    members = JSON.parse(localStorage.getItem(`menu_order_members_${currentStoreId}`)) || [];
-    orders = JSON.parse(localStorage.getItem(`menu_order_orders_${currentStoreId}`)) || {};
-    MENU_DATA = ALL_MENUS[currentStoreId] ? ALL_MENUS[currentStoreId].data : [];
-}
-
-function saveLocal() {
-    localStorage.setItem(`menu_order_members_${currentStoreId}`, JSON.stringify(members));
-    localStorage.setItem(`menu_order_orders_${currentStoreId}`, JSON.stringify(orders));
-    localStorage.setItem("menu_order_current_store", currentStoreId);
-}
-
-function renderStoreSelect() {
-    const select = document.getElementById("store-select");
-    select.innerHTML = "";
-    for (const storeId in ALL_MENUS) {
-        const opt = document.createElement("option");
-        opt.value = storeId;
-        opt.innerText = ALL_MENUS[storeId].name;
-        if (storeId === currentStoreId) {
-            opt.selected = true;
+        } else {
+            throw new Error(resJson.message);
         }
-        select.appendChild(opt);
+    } catch (err) {
+        console.error(err);
+        updateStatus("offline", "雲端讀取失敗，使用本地暫存");
+        if (isManual) alert("雲端讀取失敗：" + err.message);
     }
-}
-
-function switchStore() {
-    const newStore = document.getElementById("store-select").value;
-    if (newStore === currentStoreId) return;
-
-    currentStoreId = newStore;
-    const url = new URL(window.location);
-    url.searchParams.set('store', newStore);
-    window.history.pushState({}, '', url);
-
-    loadLocalDataForStore();
-    renderTable();
-    calculateAll();
-    updateBrand();
-    updateUserModeUI();
-    
-    if (GOOGLE_GAS_API_URL && !GOOGLE_GAS_API_URL.includes("YOUR_DEPLOY_ID")) {
-        fetchFromGoogleDrive(false);
-    }
-}
-
-function updateBrand() {
-    const storeInfo = ALL_MENUS[currentStoreId] || { name: "點餐" };
-    document.getElementById('store-brand-badge').innerText = storeInfo.name.substring(0, 2);
-    document.getElementById('store-title').innerText = `${storeInfo.name} - 多人點餐統計`;
-}
-
-function updateStatus(type, msg) {
-    const dot = document.getElementById("status-dot");
-    const text = document.getElementById("sync-status-text");
-    dot.className = "status-dot";
-    if (type === "syncing") dot.classList.add("syncing");
-    if (type === "offline") dot.classList.add("offline");
-    text.innerText = msg;
 }
 
 function renderTable() {
@@ -741,19 +683,13 @@ function renderTable() {
     const tfootRow = document.getElementById("table-foot-row");
     const tbody = document.getElementById("matrix-tbody");
 
-    while (theadRow.children.length > 3) {
-        theadRow.removeChild(theadRow.children[3]);
-    }
+    while (theadRow.children.length > 3) theadRow.removeChild(theadRow.children[3]);
     
     members.forEach(member => {
         const th = document.createElement("th");
         th.innerText = member;
-        if (member === currentUser) {
-            th.className = "current-user-col";
-            th.innerText += " (我)";
-        } else {
-            th.className = "readonly-col";
-        }
+        th.className = (member === currentUser) ? "current-user-col" : "readonly-col";
+        if (member === currentUser) th.innerText += " (我)";
         theadRow.appendChild(th);
     });
 
@@ -761,35 +697,27 @@ function renderTable() {
     thTotalQty.className = "col-summary-qty";
     thTotalQty.innerText = "店家劃單總量";
     theadRow.appendChild(thTotalQty);
-
     const thTotalAmt = document.createElement("th");
     thTotalAmt.className = "col-summary-amount";
     thTotalAmt.innerText = "品項小計";
     theadRow.appendChild(thTotalAmt);
 
     tbody.innerHTML = "";
+    if (MENU_DATA.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 2rem; color: var(--text-muted);">正在載入菜單，或此店家無菜單資料...</td></tr>`;
+    }
     MENU_DATA.forEach(item => {
         const tr = document.createElement("tr");
 
-        const tdCat = document.createElement("td");
-        tdCat.className = "sticky-col-1 col-category";
-        tdCat.innerHTML = `<span class="badge-category">${item.category}</span>`;
-        tr.appendChild(tdCat);
-
-        const tdName = document.createElement("td");
-        tdName.className = "sticky-col-2";
-        tdName.innerText = item.name;
-        tr.appendChild(tdName);
-
-        const tdPrice = document.createElement("td");
-        tdPrice.className = "sticky-col-3";
-        tdPrice.innerText = `$${item.price}`;
-        tr.appendChild(tdPrice);
+        tr.innerHTML = `
+            <td class="sticky-col-1 col-category"><span class="badge-category">${item.category}</span></td>
+            <td class="sticky-col-2">${item.name}</td>
+            <td class="sticky-col-3">$${item.price}</td>
+        `;
 
         members.forEach(member => {
             const td = document.createElement("td");
             const userQty = (orders[member] && orders[member][item.id]) ? orders[member][item.id] : 0;
-
             if (member === currentUser) {
                 td.className = "current-user-col";
                 td.innerHTML = `
@@ -797,8 +725,7 @@ function renderTable() {
                         <button class="qty-btn" onclick="updateQty('${item.id}', -1)">-</button>
                         <input class="qty-input" type="text" id="qty_${item.id}" value="${userQty}" readonly>
                         <button class="qty-btn" onclick="updateQty('${item.id}', 1)">+</button>
-                    </div>
-                `;
+                    </div>`;
             } else {
                 td.className = "readonly-col";
                 td.innerHTML = `<span class="readonly-val ${userQty > 0 ? 'has-qty' : 'zero'}">${userQty}</span>`;
@@ -806,24 +733,14 @@ function renderTable() {
             tr.appendChild(td);
         });
 
-        const tdItemTotalQty = document.createElement("td");
-        tdItemTotalQty.id = `item_total_qty_${item.id}`;
-        tdItemTotalQty.className = "col-summary-qty";
-        tdItemTotalQty.innerText = "0";
-        tr.appendChild(tdItemTotalQty);
-
-        const tdItemTotalAmt = document.createElement("td");
-        tdItemTotalAmt.id = `item_total_amt_${item.id}`;
-        tdItemTotalAmt.className = "col-summary-amount";
-        tdItemTotalAmt.innerText = "NT$ 0";
-        tr.appendChild(tdItemTotalAmt);
-
+        tr.innerHTML += `
+            <td id="item_total_qty_${item.id}" class="col-summary-qty">0</td>
+            <td id="item_total_amt_${item.id}" class="col-summary-amount">NT$ 0</td>
+        `;
         tbody.appendChild(tr);
     });
 
-    while (tfootRow.children.length > 3) {
-        tfootRow.removeChild(tfootRow.children[3]);
-    }
+    while (tfootRow.children.length > 3) tfootRow.removeChild(tfootRow.children[3]);
     members.forEach(member => {
         const td = document.createElement("td");
         td.id = `member_subtotal_${encodeURIComponent(member)}`;
@@ -837,7 +754,6 @@ function renderTable() {
     tdFootTotalQty.className = "col-summary-qty";
     tdFootTotalQty.innerText = "0";
     tfootRow.appendChild(tdFootTotalQty);
-
     const tdFootTotalAmt = document.createElement("td");
     tdFootTotalAmt.id = "foot-total-amount";
     tdFootTotalAmt.className = "col-summary-amount";
@@ -846,27 +762,17 @@ function renderTable() {
 }
 
 function updateQty(itemId, delta) {
-    if (!currentUser) {
-        alert("請先完成登入或使用訪客模式再點餐！");
-        return;
-    }
-    if (isMenuLocked) {
-        alert("菜單已被鎖定，無法修改數量！");
-        return;
-    }
+    if (!currentUser) { alert("請先登入或使用訪客模式！"); return; }
+    if (isMenuLocked) { alert("菜單已被鎖定，無法修改！"); return; }
     if (!orders[currentUser]) orders[currentUser] = {};
     let currentVal = Number(orders[currentUser][itemId] || 0);
     currentVal = Math.max(0, currentVal + delta);
     
-    if (currentVal === 0) {
-        delete orders[currentUser][itemId];
-    } else {
-        orders[currentUser][itemId] = currentVal;
-    }
+    if (currentVal === 0) delete orders[currentUser][itemId];
+    else orders[currentUser][itemId] = currentVal;
 
     const inputElem = document.getElementById(`qty_${itemId}`);
     if (inputElem) inputElem.value = currentVal;
-
     saveLocal();
     calculateAll();
 }
@@ -901,70 +807,19 @@ function calculateAll() {
         if (td) td.innerText = `NT$ ${formatAmount(memberTotals[m].amount)}`;
     });
 
-    const elFootQty = document.getElementById("foot-total-qty");
-    const elFootAmt = document.getElementById("foot-total-amount");
-    if (elFootQty) elFootQty.innerText = grandTotalQty;
-    if (elFootAmt) elFootAmt.innerText = `NT$ ${formatAmount(grandTotalAmount)}`;
-
+    document.getElementById("foot-total-qty").innerText = grandTotalQty;
+    document.getElementById("foot-total-amount").innerText = `NT$ ${formatAmount(grandTotalAmount)}`;
     document.getElementById("grand-total-amount").innerText = `NT$ ${formatAmount(grandTotalAmount)}`;
     document.getElementById("grand-total-qty").innerText = `${grandTotalQty} 份`;
     document.getElementById("total-members-count").innerText = `${members.length} 人`;
 }
 
-function clearMyOrder() {
-    if (!currentUser) return;
-    if (confirm(`確定要清空 ${currentUser} 在此店家的所有餐點數量嗎？`)) {
-        orders[currentUser] = {};
-        saveLocal();
-        renderTable();
-        calculateAll();
-    }
-}
-
-async function fetchFromGoogleDrive(isManual = false) {
-    if (!GOOGLE_GAS_API_URL) return;
-    updateStatus("syncing", "正在從雲端試算表讀取最新點餐...");
-    try {
-        const resp = await fetch(`${GOOGLE_GAS_API_URL}?storeId=${currentStoreId}&token=${encodeURIComponent(API_TOKEN)}`);
-        const resJson = await resp.json();
-        if (resJson.status === "success") {
-            const data = resJson.data;
-            members = data.members || [];
-            orders = data.orders || {};
-            isMenuLocked = data.isLocked || false;
-
-            document.getElementById('locked-notice-banner').style.display = isMenuLocked ? 'block' : 'none';
-
-            if (currentUser && !members.includes(currentUser)) {
-                members.push(currentUser);
-                if (!orders[currentUser]) orders[currentUser] = {};
-            }
-
-            saveLocal();
-            renderTable();
-            calculateAll();
-            updateUserModeUI();
-            checkAdminStatus();
-            updateStatus("online", `同步成功 (${new Date().toLocaleTimeString('zh-TW')})`);
-        } else {
-            throw new Error(resJson.message);
-        }
-    } catch (err) {
-        console.error(err);
-        updateStatus("offline", "雲端讀取失敗，使用本地暫存");
-        if (isManual) alert("雲端讀取失敗：" + err.message);
-    }
-}
-
 async function submitMyOrderToCloud() {
-    if (!currentUser) {
-        alert("請先登入後再送出！");
-        return;
-    }
+    if (!currentUser) { alert("請先登入！"); return; }
     if (isSubmitting) return;
 
     isSubmitting = true;
-    updateStatus("syncing", "正在寫入雲端試算表...");
+    updateStatus("syncing", "正在寫入雲端...");
     document.getElementById("btn-submit-order").disabled = true;
 
     try {
@@ -972,7 +827,7 @@ async function submitMyOrderToCloud() {
             token: API_TOKEN,
             action: "update_member",
             storeId: currentStoreId,
-            storeName: ALL_MENUS[currentStoreId]?.name || currentStoreId,
+            storeName: ALL_STORES[currentStoreId]?.name || currentStoreId,
             targetMember: currentUser,
             userEmail: currentUserEmail,
             memberOrders: orders[currentUser] || {},
@@ -987,8 +842,8 @@ async function submitMyOrderToCloud() {
 
         const resJson = await resp.json();
         if (resJson.status === "success") {
-            updateStatus("online", "訂單已成功儲存至 Google 試算表！");
-            alert(`🎉 恭喜！${currentUser} 的點餐已送達 Google Sheets！`);
+            updateStatus("online", "訂單已成功儲存！");
+            alert(`🎉 恭喜！${currentUser} 的點餐已送達！`);
             await fetchFromGoogleDrive(false);
         } else {
             throw new Error(resJson.message);
@@ -1004,15 +859,9 @@ async function submitMyOrderToCloud() {
 }
 
 async function adminAction(action, confirmMsg) {
-    if (!currentUserEmail || !ADMIN_ACCOUNTS.includes(currentUserEmail)) {
-        alert("權限不足！");
-        return;
-    }
+    if (!currentUserEmail || !ADMIN_ACCOUNTS.includes(currentUserEmail)) { alert("權限不足！"); return; }
     if (isSubmitting) return;
-
-    if (confirmMsg && !confirm(confirmMsg)) {
-        return;
-    }
+    if (confirmMsg && !confirm(confirmMsg)) return;
     
     isSubmitting = true;
     updateStatus("syncing", "正在執行管理員操作...");
@@ -1022,7 +871,7 @@ async function adminAction(action, confirmMsg) {
             token: API_TOKEN,
             action: action,
             storeId: currentStoreId,
-            storeName: ALL_MENUS[currentStoreId]?.name || currentStoreId,
+            storeName: ALL_STORES[currentStoreId]?.name || currentStoreId,
             userEmail: currentUserEmail,
             menuSummary: MENU_DATA.map(i => ({ id: i.id, category: i.category, name: i.name, price: i.price }))
         };
@@ -1050,14 +899,22 @@ async function adminAction(action, confirmMsg) {
     }
 }
 
+function clearMyOrder() {
+    if (!currentUser) return;
+    if (confirm(`確定要清空 ${currentUser} 在此店家的所有餐點數量嗎？`)) {
+        orders[currentUser] = {};
+        saveLocal();
+        renderTable();
+        calculateAll();
+    }
+}
+
 function adminClearAllOrders() {
     const promptResponse = prompt("危險操作！此動作將清除此店家【所有人員】的點餐資料且無法復原！\n\n請輸入 `CLEAR` 確認執行：");
     if (promptResponse === "CLEAR") {
         adminAction('admin_clear_all', null);
-    } else {
-        if (promptResponse !== null) { // User didn't click cancel
-            alert("輸入錯誤，操作已取消。");
-        }
+    } else if (promptResponse !== null) {
+        alert("輸入錯誤，操作已取消。");
     }
 }
 
@@ -1069,46 +926,28 @@ function adminUnlockMenu() {
     adminAction('admin_unlock_menu', '確定要解鎖此菜單嗎？解鎖後所有人將可以重新編輯。');
 }
 
-function closeModal(id) {
-    document.getElementById(id).style.display = 'none';
-}
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
 function openKitchenModal() {
     const listBody = document.getElementById("kitchen-list-body");
     listBody.innerHTML = "";
-    
     let hasItems = false;
     MENU_DATA.forEach(item => {
-        let count = 0;
-        members.forEach(m => {
-            count += (orders[m] && orders[m][item.id]) ? Number(orders[m][item.id]) : 0;
-        });
-
+        let count = members.reduce((sum, m) => sum + Number((orders[m] && orders[m][item.id]) || 0), 0);
         if (count > 0) {
             hasItems = true;
-            const chip = document.createElement("div");
-            chip.className = "order-item-chip";
-            chip.innerHTML = `
-                <span><strong>[${item.category}]</strong> ${item.name}</span>
-                <span style="color: var(--accent-orange); font-weight: bold;">${count} ${item.unit || '份'}</span>
-            `;
-            listBody.appendChild(chip);
+            listBody.innerHTML += `<div class="order-item-chip"><span><strong>[${item.category}]</strong> ${item.name}</span><span style="color: var(--accent-orange); font-weight: bold;">${count} ${item.unit || '份'}</span></div>`;
         }
     });
-
-    if (!hasItems) {
-        listBody.innerHTML = "<div style='text-align:center; padding: 20px; color: var(--text-muted);'>目前無任何人點餐！</div>";
-    }
-
+    if (!hasItems) listBody.innerHTML = "<div style='text-align:center; padding: 20px; color: var(--text-muted);'>目前無任何人點餐！</div>";
     document.getElementById("kitchen-modal").style.display = "flex";
 }
 
 function openShareModal() {
-    const storeInfo = ALL_MENUS[currentStoreId] || { name: "點餐" };
+    const storeInfo = ALL_STORES[currentStoreId] || { name: "點餐" };
     let text = `🍱【${storeInfo.name} 點餐收費名單】\n`;
     text += `📅 統計時間：${new Date().toLocaleDateString('zh-TW')} ${new Date().toLocaleTimeString('zh-TW', {hour: '2-digit', minute:'2-digit'})}\n`;
     text += `------------------------------------\n`;
-
     let grandAmount = 0;
 
     members.forEach(m => {
@@ -1140,12 +979,8 @@ function copyShareText() {
     const area = document.getElementById("share-text-area");
     area.select();
     try {
-        navigator.clipboard.writeText(area.value).then(() => {
-            alert("已成功複製 LINE 明細至剪貼簿！");
-        }).catch(() => {
-            document.execCommand("copy");
-            alert("已複製到剪貼簿 (備用模式)！");
-        });
+        navigator.clipboard.writeText(area.value).then(() => alert("已成功複製 LINE 明細至剪貼簿！"))
+        .catch(() => { document.execCommand("copy"); alert("已複製到剪貼簿 (備用模式)！"); });
     } catch (e) {
         document.execCommand("copy");
         alert("已複製到剪貼簿 (備用模式)！");
