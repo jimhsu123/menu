@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- TODO: 請務必填入您在 GCP Console 取得的 Client ID -->
+<meta name="google-signin-client_id" content="332175692979-nkrni08k8fleg7te2uju417rmc207vlv.apps.googleusercontent.com">
+<title>多店家多人點餐系統 - menu_order</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root {
+  --bg-dark: #121418;--card-bg: #1c1f26;--border-color: #2e3440;--accent-orange: #f97316;
+  --accent-red: #ef4444;--accent-yellow: #eab308;--accent-green: #10b981;--accent-blue: #3b82f6;
+  --text-main: #f3f4f6;--text-muted: #9ca3af;--row-even: #1e222a;--row-hover: #2a303c;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  padding: 12px;
+  line-height: 1.5;
+}
+.container { max-width: 1400px; margin: 0 auto; }
+.submit-panel {
+  background: linear-gradient(135deg, #1e2638, #182030);
+  border: 1px solid var(--accent-blue);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+.submit-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.submit-badge {
+  font-size: 0.85rem;
+  background-color: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+.select-store {
+  background-color: #272c36;
+  border: 1px solid #4b5563;
+  color: white;
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+}
+#google-login-container { display: flex; align-items: center; gap: 10px; }
+#user-info { display: none; align-items: center; gap: 8px; font-size: 0.9rem; }
+#user-avatar { width: 28px; height: 28px; border-radius: 50%; }
+.btn-submit-main {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  font-size: 0.95rem;
+  font-weight: bold;
+  padding: 8px 18px;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-submit-main:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+  transform: translateY(-1px);
+}
+.btn-submit-main:disabled { background: #4b5563; cursor: not-allowed; box-shadow: none; }
+.sync-status-indicator { font-size: 0.82rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px; }
+.status-dot { width: 10px; height: 10px; border-radius: 50%; background-color: var(--accent-green); flex-shrink: 0; }
+.status-dot.syncing { background-color: var(--accent-yellow); animation: pulse 1s infinite; }
+.status-dot.offline { background-color: var(--accent-red); }
+@keyframes pulse { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
+header {
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px;
+  padding-bottom: 12px; border-bottom: 1px solid var(--border-color); margin-bottom: 14px;
+}
+.brand-title { display: flex; align-items: center; gap: 10px; }
+.brand-badge {
+  background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));
+  color: white; font-weight: 800; padding: 5px 12px; border-radius: 8px; font-size: 1.2rem;
+}
+.brand-subtitle { color: var(--text-muted); font-size: 0.82rem; }
+.stats-bar { display: flex; gap: 10px; flex-wrap: wrap; }
+.stat-card { background-color: var(--card-bg); border: 1px solid var(--border-color); padding: 6px 14px; border-radius: 8px; text-align: right; }
+.stat-label { font-size: 0.72rem; color: var(--text-muted); }
+.stat-value { font-size: 1.15rem; font-weight: bold; color: var(--accent-yellow); }
+.toolbar {
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px;
+  margin-bottom: 14px; background: var(--card-bg); padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-color);
+}
+.action-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+button { cursor: pointer; border: none; border-radius: 6px; padding: 7px 12px; font-size: 0.85rem; font-weight: 600; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 5px; }
+.btn-primary { background-color: var(--accent-orange); color: white; }
+.btn-primary:hover { background-color: #ea580c; }
+.btn-secondary { background-color: #374151; color: #e5e7eb; }
+.btn-secondary:hover { background-color: #4b5563; }
+.btn-success { background-color: var(--accent-green); color: white; }
+.btn-danger-outline { background-color: transparent; border: 1px solid var(--accent-red); color: #f87171; }
+.btn-danger-outline:hover { background-color: var(--accent-red); color: white; }
+.table-container { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border-color); background-color: var(--card-bg); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4); max-height: 65vh; position: relative; }
+table { width: 100%; border-collapse: collapse; text-align: center; font-size: 0.9rem; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
+thead th { position: sticky; top: 0; background-color: #232833; z-index: 10; color: #e5e7eb; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+.sticky-col-1 { position: sticky; left: 0; background-color: #1c1f26; z-index: 5; text-align: left; min-width: 105px; }
+.sticky-col-2 { position: sticky; left: 105px; background-color: #1c1f26; z-index: 5; text-align: left; min-width: 145px; font-weight: 600; }
+.sticky-col-3 { position: sticky; left: 250px; background-color: #1c1f26; z-index: 5; min-width: 60px; color: var(--accent-yellow); border-right: 2px solid var(--border-color); }
+thead th.sticky-col-1, thead th.sticky-col-2, thead th.sticky-col-3 { z-index: 15; background-color: #232833; }
+tbody tr:nth-child(even) { background-color: var(--row-even); }
+tbody tr:nth-child(even) .sticky-col-1, tbody tr:nth-child(even) .sticky-col-2, tbody tr:nth-child(even) .sticky-col-3 { background-color: var(--row-even); }
+tbody tr:hover { background-color: var(--row-hover); }
+tbody tr:hover .sticky-col-1, tbody tr:hover .sticky-col-2, tbody tr:hover .sticky-col-3 { background-color: var(--row-hover); }
+.current-user-col { background-color: rgba(59, 130, 246, 0.12) !important; border-left: 2px solid var(--accent-blue); border-right: 2px solid var(--accent-blue); }
+thead th.current-user-col { background-color: #1e2e4a !important; color: #93c5fd; }
+.readonly-col { color: var(--text-muted); min-width: 65px; }
+.readonly-val { display: inline-block; font-weight: 600; color: #d1d5db; }
+.readonly-val.has-qty { color: #60a5fa; font-weight: 700; }
+.readonly-val.zero { color: #4b5563; }
+.qty-control { display: inline-flex; align-items: center; background-color: #272c36; border-radius: 6px; border: 1px solid #3b82f6; }
+.qty-btn { background: transparent; border: none; color: #93c5fd; padding: 3px 8px; cursor: pointer; font-size: 0.95rem; font-weight: bold; }
+.qty-btn:hover { background-color: #3b82f6; color: white; }
+.qty-input { width: 34px; text-align: center; background: transparent; border: none; color: white; font-weight: 700; outline: none; }
+tfoot tr { position: sticky; bottom: 0; background-color: #171a21; font-weight: bold; z-index: 10; }
+tfoot td.sticky-col-1, tfoot td.sticky-col-2, tfoot td.sticky-col-3 { background-color: #171a21; z-index: 11; }
+.badge-category { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; background-color: #312e71; color: #e0e7ff; }
+.col-summary-qty { background-color: rgba(249, 115, 22, 0.1); color: var(--accent-orange); font-weight: bold; }
+.col-summary-amount { background-color: rgba(234, 179, 8, 0.1); color: var(--accent-yellow); font-weight: bold; }
+@media (max-width: 768px) {
+  .col-category, th.col-category, td.col-category { display: none !important; }
+  .sticky-col-2 { left: 0 !important; min-width: 120px !important; }
+  .sticky-col-3 { left: 120px !important; min-width: 55px !important; }
+  .brand-title h2 { font-size: 1.1rem; }
+  .brand-badge { font-size: 1rem; padding: 3px 8px; }
+  .submit-panel { padding: 10px; }
+  .toolbar { padding: 8px; }
+}
+.modal-overlay { 
+  display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; 
+  background: rgba(0, 0, 0, 0.75); z-index: 100; justify-content: center; align-items: center; padding: 16px; 
+}
+.modal-content { 
+  background-color: var(--card-bg); border: 1px solid var(--border-color); width: 100%; max-width: 600px; 
+  max-height: 85vh; border-radius: 12px; display: flex; flex-direction: column; 
+}
+.modal-header { padding: 12px 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+.modal-body { padding: 16px; overflow-y: auto; }
+.modal-footer { padding: 12px 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px; }
+textarea.summary-text { width: 100%; height: 260px; background-color: #121418; border: 1px solid var(--border-color); color: #e5e7eb; padding: 10px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; }
+.order-item-chip { display: flex; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid #2e3440; }
+</style>
+</head>
+<body>
+<div class="container" id="main-container">
+    <div class="submit-panel">
+        <div class="submit-left">
+            <span class="submit-badge">選擇店家</span>
+            <select id="store-select" class="select-store" onchange="switchStore()"></select>
+            <div id="google-login-container">
+                <div id="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="outline" data-text="signin_with" data-size="large" data-logo_alignment="left"></div>
+                <div id="user-info">
+                    <img id="user-avatar" src="" alt="avatar">
+                    <span id="user-name-display"></span>
+                    <button class="btn-secondary" onclick="logout()">登出</button>
+                </div>
+            </div>
+            <button class="btn-submit-main" id="btn-submit-order" onclick="submitMyOrderToCloud()" disabled>送出我的點餐</button>
+            <button class="btn-secondary" onclick="fetchFromGoogleDrive(true)">重新整理</button>
+        </div>
+        <div class="sync-status-indicator">
+            <span class="status-dot" id="status-dot"></span>
+            <span id="sync-status-text">請先登入 Google 帳號以開始點餐</span>
+        </div>
+    </div>
+
+    <header>
+        <div class="brand-title">
+            <div class="brand-badge" id="store-brand-badge">點餐</div>
+            <div>
+                <h2 id="store-title">多店家點餐與費用統計矩陣</h2>
+                <div class="brand-subtitle">menu_order - Google Sheets 同步版</div>
+            </div>
+        </div>
+        <div class="stats-bar">
+            <div class="stat-card"><div class="stat-label">全單總金額</div><div class="stat-value" id="grand-total-amount">NT$ 0</div></div>
+            <div class="stat-card"><div class="stat-label">已點總數量</div><div class="stat-value" id="grand-total-qty">0 份</div></div>
+            <div class="stat-card"><div class="stat-label">用餐人數</div><div class="stat-value" id="total-members-count">0 人</div></div>
+        </div>
+    </header>
+
+    <div class="toolbar">
+        <div class="action-controls">
+            <button class="btn-danger-outline" onclick="clearMyOrder()">清空我的數量</button>
+            <button class="btn-secondary" onclick="openKitchenModal()">店家劃單彙整</button>
+            <button class="btn-success" onclick="openShareModal()">複製 LINE 明細</button>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <table id="matrix-table">
+            <thead>
+                <tr id="table-header-row">
+                    <th class="sticky-col-1 col-category">分類</th>
+                    <th class="sticky-col-2">品項名稱</th>
+                    <th class="sticky-col-3">單價</th>
+                    <th class="col-summary-qty">店家劃單總量</th>
+                    <th class="col-summary-amount">品項小計</th>
+                </tr>
+            </thead>
+            <tbody id="matrix-tbody"></tbody>
+            <tfoot>
+                <tr id="table-foot-row">
+                    <td class="sticky-col-1 col-category">統計</td>
+                    <td class="sticky-col-2">個人應付總計</td>
+                    <td class="sticky-col-3">-</td>
+                    <td id="foot-total-qty" class="col-summary-qty">0</td>
+                    <td id="foot-total-amount" class="col-summary-amount">NT$ 0</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
+<!-- 店家劃單彈窗 (無變更) -->
+<div class="modal-overlay" id="kitchen-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>店家劃單彙整清單 (僅顯示有數量品項)</h3>
+            <button class="btn-secondary" onclick="closeModal('kitchen-modal')">×</button>
+        </div>
+        <div class="modal-body" id="kitchen-list-body"></div>
+        <div class="modal-footer">
+            <button class="btn-primary" onclick="closeModal('kitchen-modal')">關閉</button>
+        </div>
+    </div>
+</div>
+
+<!-- LINE 分帳明細彈窗 (無變更) -->
+<div class="modal-overlay" id="share-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>LINE 對帳明細訊息</h3>
+            <button class="btn-secondary" onclick="closeModal('share-modal')">×</button>
+        </div>
+        <div class="modal-body">
+            <textarea id="share-text-area" class="summary-text" readonly></textarea>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-success" onclick="copyShareText()">複製到剪貼簿</button>
+            <button class="btn-secondary" onclick="closeModal('share-modal')">關閉</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ===================================================================
+// ======== CONFIGURATION (密鑰 混淆版) =========================
+// ===================================================================
+const _B64_GAS_URL = "aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3Mvcy9BS2Z5Y2J6OGdZTWVHM1cxaF9HNEhyTjdiZEdFZXk3NHE3cG5rSEZjQUdCWWdEVWpSS1UzQ3c2U2U4cEtJSHpxdTdxQlRSME51Zy9leGVj";
+const _B64_API_TOKEN = "TXlTdVAzclMzY1IzdFQwa0VuMjAyNCE=";
+
+const GOOGLE_GAS_API_URL = atob(_B64_GAS_URL);
+const API_TOKEN = atob(_B64_API_TOKEN);
+
+// ===============================================
+// ======== MENU DATA (菜單資料庫) =================
+// ===============================================
+const ALL_MENUS = {
+    "shaoye": {
+        name: "燒夜串燒",
+        data: [
+            { id: "A01", category: "鹽烤串燒", name: "牛肋串(鹽烤)", price: 50, unit: "串" },
+            { id: "A02", category: "鹽烤串燒", name: "翼板牛肉串(鹽烤)", price: 56, unit: "串" },
+            { id: "A03", category: "鹽烤串燒", name: "梅花豚肉串(鹽烤)", price: 33, unit: "串" },
+            { id: "A04", category: "鹽烤串燒", name: "五花豚肉串(鹽烤)", price: 33, unit: "串" },
+            { id: "A05", category: "鹽烤串燒", name: "雞腿串(鹽烤)", price: 35, unit: "串" },
+            { id: "A06", category: "鹽烤串燒", name: "雞肉串(鹽烤)", price: 29, unit: "串" },
+            { id: "B01", category: "醬烤串燒-牛", name: "青蔥小肥牛", price: 50, unit: "串" },
+            { id: "B02", category: "醬烤串燒-牛", name: "牛肋串(醬烤)", price: 50, unit: "串" },
+            { id: "B03", category: "醬烤串燒-牛", name: "翼板牛肉串(醬烤)", price: 56, unit: "串" },
+            { id: "B04", category: "醬烤串燒-豬", name: "青蔥豚肉串", price: 45, unit: "串" },
+            { id: "B05", category: "醬烤串燒-豬", name: "五花豚肉串(醬烤)", price: 33, unit: "串" },
+            { id: "B06", category: "醬烤串燒-豬", name: "梅花豚肉串(醬烤)", price: 33, unit: "串" },
+            { id: "B07", category: "醬烤串燒-豬", name: "珍珠香腸", price: 39, unit: "串" },
+            { id: "B08", category: "醬烤串燒-豬", name: "貢丸", price: 39, unit: "串" },
+            { id: "B09", category: "醬烤串燒-雞", name: "雞翅", price: 48, unit: "串" },
+            { id: "B10", category: "醬烤串燒-雞", name: "雞腿串(醬烤)", price: 35, unit: "串" },
+            { id: "B11", category: "醬烤串燒-雞", name: "雞肉串(醬烤)", price: 29, unit: "串" },
+            { id: "B12", category: "醬烤串燒-雞", name: "雞尾椎", price: 37, unit: "串" },
+            { id: "B13", category: "醬烤串燒-雞", name: "雞心", price: 27, unit: "串" },
+            { id: "B14", category: "醬烤串燒-雞", name: "雞皮", price: 30, unit: "串" },
+            { id: "B15", category: "醬烤串燒-蔬菜", name: "花菜", price: 22, unit: "串" },
+            { id: "B16", category: "醬烤串燒-蔬菜", name: "杏鮑菇", price: 22, unit: "串" },
+            { id: "B17", category: "醬烤串燒-蔬菜", name: "櫛瓜", price: 26, unit: "串" },
+            { id: "B18", category: "醬烤串燒-蔬菜", name: "小黃瓜", price: 22, unit: "串" },
+            { id: "B19", category: "醬烤串燒-蔬菜", name: "青椒", price: 22, unit: "串" },
+            { id: "B20", category: "醬烤串燒-蔬菜", name: "香菇", price: 40, unit: "串" },
+            { id: "B21", category: "醬烤串燒-其他", name: "甜不辣", price: 29, unit: "串" },
+            { id: "B22", category: "醬烤串燒-其他", name: "豆干", price: 29, unit: "串" },
+            { id: "B23", category: "醬烤串燒-其他", name: "百頁豆腐", price: 27, unit: "串" },
+            { id: "B24", category: "醬烤串燒-其他", name: "米血糕", price: 27, unit: "串" },
+            { id: "B25", category: "醬烤串燒-其他", name: "豆皮", price: 27, unit: "串" },
+            { id: "B26", category: "醬烤串燒-其他", name: "米腸", price: 37, unit: "串" },
+            { id: "B27", category: "醬烤串燒-其他", name: "黑輪", price: 23, unit: "串" },
+            { id: "C01", category: "炸物&小菜", name: "美式脆薯", price: 65, unit: "份" },
+            { id: "C02", category: "炸物&小菜", name: "麥克雞塊", price: 65, unit: "份" },
+            { id: "C03", category: "炸物&小菜", name: "香酥雞球", price: 65, unit: "份" },
+            { id: "C04", category: "炸物&小菜", name: "炸烤餃子", price: 35, unit: "份" },
+            { id: "C05", category: "炸物&小菜", name: "燒夜泡菜", price: 60, unit: "份" },
+            { id: "C06", category: "炸物&小菜", name: "煉乳銀絲卷", price: 60, unit: "份" },
+            { id: "C07", category: "炸物&小菜", name: "白飯(內用續)", price: 20, unit: "份" },
+            { id: "D01", category: "燒烤單點", name: "炙燒霜降牛", price: 140, unit: "份" },
+            { id: "D02", category: "燒烤單點", name: "醬烤魷魚", price: 150, unit: "尾" },
+            { id: "D03", category: "燒烤單點", name: "鹽烤松阪豬", price: 250, unit: "份" },
+            { id: "D04", category: "燒烤單點", name: "鹽烤鯖魚", price: 150, unit: "尾" },
+            { id: "D05", category: "燒烤單點", name: "鹽烤白蝦", price: 100, unit: "份" },
+            { id: "D06", category: "燒烤單點", name: "鹽烤秋刀魚", price: 100, unit: "尾" },
+            { id: "D07", category: "燒烤單點", name: "醬烤玉米筍", price: 70, unit: "份" },
+            { id: "D08", category: "燒烤單點", name: "醬烤四季豆", price: 60, unit: "份" }
+        ]
+    },
+    "dalutong": {
+        name: "大滷桶",
+        data: [
+            { id: 'DT01', category: '料組合-14元/3個', name: '鳥蛋', price: 14/3, unit: '個' },
+            { id: 'DT02', category: '料組合-14元/3個', name: '蒟蒻絲', price: 14/3, unit: '個' },
+            { id: 'DT03', category: '料組合-14元/3個', name: '小豆干', price: 14/3, unit: '個' },
+            { id: 'DT04', category: '料組合-14元/3個', name: '鑫鑫腸', price: 14/3, unit: '個' },
+            { id: 'DT05', category: '料組合-14元/3個', name: '北海翅', price: 14/3, unit: '個' },
+            { id: 'DT06', category: '料組合-14元/3個', name: '黃金魚蛋', price: 14/3, unit: '個' },
+            { id: 'DT07', category: '料組合-20元/2個', name: '海帶', price: 20/2, unit: '個' },
+            { id: 'DT08', category: '料組合-20元/2個', name: '貢丸', price: 20/2, unit: '個' },
+            { id: 'DT09', category: '料組合-20元/2個', name: '甜不辣', price: 20/2, unit: '個' },
+            { id: 'DT10', category: '料組合-20元/2個', name: '黑輪條', price: 20/2, unit: '個' },
+            { id: 'DT11', category: '料組合-32元/3個', name: '魚豆腐', price: 32/3, unit: '個' },
+            { id: 'DT12', category: '料組合-32元/3個', name: '麻吉燒', price: 32/3, unit: '個' },
+            { id: 'DT13', category: '料組合-32元/3個', name: '花枝丸', price: 32/3, unit: '個' },
+            { id: 'DT14', category: '料組合-32元/3個', name: '章魚丸', price: 32/3, unit: '個' },
+            { id: 'DT15', category: '料組合-32元/3個', name: '魚包蛋', price: 32/3, unit: '個' },
+            { id: 'DT16', category: '料組合-32元/3個', name: '魚餃', price: 32/3, unit: '個' },
+            { id: 'DT17', category: '料組合-32元/3個', name: '燕餃', price: 32/3, unit: '個' },
+            { id: 'DT18', category: '料組合-32元/3個', name: '墨魚丸', price: 32/3, unit: '個' },
+            { id: 'DT19', category: '料組合-32元/3個', name: '北貝', price: 32/3, unit: '個' },
+            { id: 'DT20', category: '麵飯', name: '刀削麵', price: 45, unit: '份' },
+            { id: 'DT21', category: '麵飯', name: '雞絲麵', price: 30, unit: '份' },
+            { id: 'DT22', category: '麵飯', name: '陽春麵', price: 30, unit: '份' },
+            { id: 'DT23', category: '麵飯', name: '媽媽拉麵', price: 30, unit: '份' },
+            { id: 'DT24', category: '麵飯', name: '王子麵', price: 20, unit: '份' },
+            { id: 'DT25', category: '麵飯', name: '科學麵', price: 20, unit: '份' },
+            { id: 'DT26', category: '麵飯', name: '脆麵', price: 15, unit: '份' },
+            { id: 'DT27', category: '麵飯', name: '白飯', price: 15, unit: '份' },
+            { id: 'DT28', category: '麵飯', name: '細冬粉', price: 25, unit: '份' },
+            { id: 'DT29', category: '麵飯', name: '寬冬粉', price: 25, unit: '份' },
+            { id: 'DT30', category: '麵飯', name: '米粉', price: 30, unit: '份' },
+            { id: 'DT31', category: '麵飯', name: '蒸煮麵', price: 30, unit: '份' },
+            { id: 'DT32', category: '麵飯', name: '意麵', price: 30, unit: '份' },
+            { id: 'DT33', category: '麵飯', name: '烏龍麵', price: 35, unit: '份' },
+            { id: 'DT34', category: '麵飯', name: 'Q拉麵', price: 45, unit: '份' },
+            { id: 'DT35', category: '單品/單點', name: '滷蛋', price: 15, unit: '個' },
+            { id: 'DT36', category: '單品/單點', name: '花生', price: 45, unit: '份' },
+            { id: 'DT37', category: '單品/單點', name: '大豆乾', price: 25, unit: '份' },
+            { id: 'DT38', category: '單品/單點', name: '米血糕', price: 25, unit: '份' },
+            { id: 'DT39', category: '單品/單點', name: '竹輪', price: 25, unit: '份' },
+            { id: 'DT40', category: '單品/單點', name: '大熱狗', price: 30, unit: '份' },
+            { id: 'DT41', category: '單品/單點', name: '德式香腸', price: 30, unit: '份' },
+            { id: 'DT42', category: '單品/單點', name: '甜芋籤', price: 25, unit: '份' },
+            { id: 'DT43', category: '單品/單點', name: '糯米腸', price: 28, unit: '份' },
+            { id: 'DT44', category: '單品/單點', name: '芋粿巧', price: 28, unit: '份' },
+            { id: 'DT45', category: '單品/單點', name: '鱈魚燒', price: 30, unit: '份' },
+            { id: 'DT46', category: '單品/單點', name: '蘭花干', price: 30, unit: '份' },
+            { id: 'DT47', category: '單品/單點', name: '龍蝦沙拉', price: 45, unit: '份' },
+            { id: 'DT48', category: '單品/單點', name: '炸豆包', price: 30, unit: '份' },
+            { id: 'DT49', category: '單品/單點', name: '黃金豆腐', price: 20, unit: '份' },
+            { id: 'DT50', category: '單品/單點', name: '鴨血', price: 22, unit: '份' },
+            { id: 'DT51', category: '單品/單點', name: '蝦捲', price: 35, unit: '份' },
+            { id: 'DT52', category: '單品/單點', name: '蛋餃', price: 45, unit: '份' },
+            { id: 'DT53', category: '單品/單點', name: '素雞', price: 28, unit: '份' },
+            { id: 'DT54', category: '單品/單點', name: '蟳味棒', price: 7, unit: '個' },
+            { id: 'DT55', category: '單品/單點', name: '水晶餃', price: 7, unit: '個' },
+            { id: 'DT56', category: '單品/單點', name: '素肚(大)', price: 45, unit: '份' },
+            { id: 'DT57', category: '單品/單點', name: '素肚(小)', price: 25, unit: '份' },
+            { id: 'DT58', category: '肉類&單點', name: '豬皮', price: 25, unit: '兩' },
+            { id: 'DT59', category: '肉類&單點', name: '豬耳朵', price: 35, unit: '兩' },
+            { id: 'DT60', category: '肉類&單點', name: '三層肉', price: 48, unit: '兩' },
+            { id: 'DT61', category: '肉類&單點', name: '腱子肉', price: 48, unit: '兩' },
+            { id: 'DT62', category: '肉類&單點', name: '豬肉片(大)', price: 80, unit: '份' },
+            { id: 'DT63', category: '肉類&單點', name: '豬肉片(小)', price: 50, unit: '份' },
+            { id: 'DT64', category: '肉類&單點', name: '菊花', price: 48, unit: '兩' },
+            { id: 'DT65', category: '肉類&單點', name: '雞肉片(小)', price: 50, unit: '份' },
+            { id: 'DT66', category: '肉類&單點', name: '雞肉片(大)', price: 80, unit: '份' },
+            { id: 'DT67', category: '肉類&單點', name: '豬大腸', price: 50, unit: '兩' },
+            { id: 'DT68', category: '肉類&單點', name: '肝連肉', price: 40, unit: '兩' },
+            { id: 'DT69', category: '肉類&單點', name: '鴨心', price: 30, unit: '串' },
+            { id: 'DT70', category: '肉類&單點', name: '豬頭皮', price: 45, unit: '份' },
+            { id: 'DT71', category: '肉類&單點', name: '培根牛', price: 100, unit: '份' },
+            { id: 'DT72', category: '肉類&單點', name: '雞胗', price: 50, unit: '份' },
+            { id: 'DT73', category: '季節時蔬/菇類', name: '白蘿蔔', price: 25, unit: '份' },
+            { id: 'DT74', category: '季節時蔬/菇類', name: '高麗菜', price: 40, unit: '份' },
+            { id: 'DT75', category: '季節時蔬/菇類', name: '大陸妹', price: 40, unit: '份' },
+            { id: 'DT76', category: '季節時蔬/菇類', name: '青花菜', price: 35, unit: '份' },
+            { id: 'DT77', category: '季節時蔬/菇類', name: '四季豆', price: 45, unit: '份' },
+            { id: 'DT78', category: '季節時蔬/菇類', name: '洋蔥', price: 30, unit: '份' },
+            { id: 'DT79', category: '季節時蔬/菇類', name: '水蓮', price: 35, unit: '份' },
+            { id: 'DT80', category: '季節時蔬/菇類', name: '娃娃菜', price: 45, unit: '份' },
+            { id: 'DT81', category: '季節時蔬/菇類', name: '玉米筍', price: 45, unit: '份' },
+            { id: 'DT82', category: '季節時蔬/菇類', name: '苦瓜', price: 35, unit: '份' },
+            { id: 'DT83', category: '季節時蔬/菇類', name: '人蔘山藥', price: 45, unit: '份' },
+            { id: 'DT84', category: '季節時蔬/菇類', name: '玉米', price: 30, unit: '份' },
+            { id: 'DT85', category: '季節時蔬/菇類', name: '青椒', price: 35, unit: '份' },
+            { id: 'DT86', category: '季節時蔬/菇類', name: '茼蒿(冬季)', price: 45, unit: '份' },
+            { id: 'DT87', category: '季節時蔬/菇類', name: '絲瓜', price: 35, unit: '份' },
+            { id: 'DT88', category: '季節時蔬/菇類', name: '小黃瓜', price: 25, unit: '份' },
+            { id: 'DT89', category: '季節時蔬/菇類', name: '筊白筍', price: 45, unit: '份' },
+            { id: 'DT90', category: '季節時蔬/菇類', name: '金針菇', price: 30, unit: '份' },
+            { id: 'DT91', category: '季節時蔬/菇類', name: '香菇', price: 30, unit: '份' },
+            { id: 'DT92', category: '季節時蔬/菇類', name: '杏鮑菇', price: 30, unit: '份' },
+            { id: 'DT93', category: '季節時蔬/菇類', name: '秀珍菇', price: 30, unit: '份' },
+            { id: 'DT94', category: '季節時蔬/菇類', name: '黑木耳', price: 30, unit: '份' },
+            { id: 'DT95', category: '季節時蔬/菇類', name: '蓮藕', price: 45, unit: '份' },
+            { id: 'DT96', category: '季節時蔬/菇類', name: '蘆筍', price: 45, unit: '份' },
+            { id: 'DT97', category: '季節時蔬/菇類', name: '美白菇', price: 45, unit: '份' },
+            { id: 'DT98', category: '季節時蔬/菇類', name: '節瓜', price: 30, unit: '份' },
+            { id: 'DT99', category: '季節時蔬/菇類', name: '南瓜', price: 55, unit: '份' },
+            { id: 'DT100', category: '季節時蔬/菇類', name: '牛奶白菜', price: 40, unit: '份' },
+            { id: 'DT101', category: '其他/套餐', name: '油皮(大)', price: 50, unit: '份' },
+            { id: 'DT102', category: '其他/套餐', name: '老油條', price: 45, unit: '份' },
+            { id: 'DT103', category: '其他/套餐', name: '油皮(小)', price: 25, unit: '份' },
+            { id: 'DT104', category: '其他/套餐', name: '麻辣鴨血', price: 50, unit: '份' },
+            { id: 'DT105', category: '其他/套餐', name: '百頁豆腐(大)', price: 50, unit: '份' },
+            { id: 'DT106', category: '其他/套餐', name: '百頁豆腐(小)', price: 25, unit: '份' },
+            { id: 'DT107', category: '其他/套餐', name: '加酸菜', price: 15, unit: '份' },
+            { id: 'DT108', category: '其他/套餐', name: '汽水', price: 25, unit: '瓶' },
+            { id: 'DT109', category: '其他/套餐', name: '礦泉水', price: 20, unit: '瓶' }
+        ]
+    },
+    "kekou": {
+        name: "可口滷味",
+        data: [
+            { id: 'K01', category: '肉類', name: '脆腸 (附酸菜)', price: 60, unit: '份' },
+            { id: 'K02', category: '肉類', name: '鴨舌 (5隻)', price: 70, unit: '份' },
+            { id: 'K03', category: '肉類', name: '鴨腸 (附酸菜)', price: 60, unit: '份' },
+            { id: 'K04', category: '肉類', name: '豬耳朵', price: 40, unit: '份' },
+            { id: 'K05', category: '肉類', name: '鴨心', price: 50, unit: '份' },
+            { id: 'K06', category: '肉類', name: '豬頭皮', price: 40, unit: '份' },
+            { id: 'K07', category: '肉類', name: '雞胗', price: 50, unit: '份' },
+            { id: 'K08', category: '肉類', name: '豬腱肉 (秤重計價)', price: 0, unit: '份' },
+            { id: 'K09', category: '豆製品/其他', name: '小豆乾', price: 20, unit: '份' },
+            { id: 'K10', category: '豆製品/其他', name: '百葉豆腐', price: 35, unit: '個' },
+            { id: 'K11', category: '豆製品/其他', name: '黑豆乾', price: 15, unit: '片' },
+            { id: 'K12', category: '豆製品/其他', name: '素肚', price: 35, unit: '個' },
+            { id: 'K13', category: '豆製品/其他', name: '素雞', price: 25, unit: '個' },
+            { id: 'K14', category: '豆製品/其他', name: '豆腸', price: 25, unit: '條' },
+            { id: 'K15', category: '豆製品/其他', name: '豆卷', price: 15, unit: '個' },
+            { id: 'K16', category: '蔬菜/菇類', name: '海帶 (1份/2片)', price: 25, unit: '份' },
+            { id: 'K17', category: '蔬菜/菇類', name: '海帶 (1片)', price: 15, unit: '片' },
+            { id: 'K18', category: '蔬菜/菇類', name: '杏鮑菇', price: 40, unit: '份' },
+            { id: 'K19', category: '澱粉/加工品', name: '米血 (1份/2片)', price: 30, unit: '份' },
+            { id: 'K20', category: '澱粉/加工品', name: '米血 (1片)', price: 15, unit: '片' },
+            { id: 'K21', category: '澱粉/加工品', name: '甜不辣 (1份/2片)', price: 25, unit: '份' },
+            { id: 'K22', category: '澱粉/加工品', name: '甜不辣 (1片)', price: 15, unit: '片' },
+            { id: 'K23', category: '丸類', name: '貢丸 (1份/3顆)', price: 30, unit: '份' },
+            { id: 'K24', category: '丸類', name: '貢丸 (1顆)', price: 10, unit: '顆' },
+            { id: 'K25', category: '丸類', name: '花枝丸 (1份/3顆)', price: 30, unit: '份' },
+            { id: 'K26', category: '丸類', name: '花枝丸 (1顆)', price: 10, unit: '顆' },
+            { id: 'K27', category: '雞肉類', name: '雞腳 (1份/5隻)', price: 50, unit: '份' },
+            { id: 'K28', category: '雞肉類', name: '雞脖子', price: 10, unit: '隻' },
+            { id: 'K29', category: '雞肉類', name: '雞翅', price: 25, unit: '隻' },
+            { id: 'K30', category: '鴨肉類', name: '鴨翅', price: 35, unit: '隻' },
+            { id: 'K31', category: '鴨肉類', name: '鴨脖子', price: 30, unit: '隻' },
+            { id: 'K32', category: '單點', name: '酸菜', price: 30, unit: '份' }
+        ]
+    }
+};
+
+// ===============================================
+// ======== CORE LOGIC (核心程式) ================
+// ===============================================
+let MENU_DATA = [];
+let members = [];
+let orders = {};
+let currentUser = "";
+let currentStoreId = "";
+let isSubmitting = false;
+
+// 價格與金額顯示格式化函數
+function formatPrice(val) {
+    if (typeof val !== 'number') val = Number(val);
+    if (isNaN(val)) return '0';
+    return val.toLocaleString('zh-TW', { maximumFractionDigits: 2 });
+}
+
+function formatAmount(val) {
+    if (typeof val !== 'number') val = Number(val);
+    if (isNaN(val)) return '0';
+    const rounded = Math.round((val + Number.EPSILON) * 100) / 100;
+    return rounded.toLocaleString('zh-TW', { maximumFractionDigits: 2 });
+}
+
+window.onload = function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const storeFromUrl = urlParams.get('store');
+
+    currentStoreId = storeFromUrl && ALL_MENUS[storeFromUrl] 
+        ? storeFromUrl 
+        : localStorage.getItem("menu_order_current_store") || Object.keys(ALL_MENUS)[0];
+
+    init();
+};
+
+function init() {
+    renderStoreSelect();
+    loadLocalDataForStore();
+    renderTable();
+    calculateAll();
+    updateBrand();
+    updateUserModeUI();
+    initializeGoogleSignIn();
+
+    if (GOOGLE_GAS_API_URL && !GOOGLE_GAS_API_URL.includes("YOUR_DEPLOY_ID")) {
+        fetchFromGoogleDrive(false);
+    } else {
+        updateStatus("offline", "🚫 未填入 Google 網址，目前為單機暫存模式");
+    }
+}
+
+function initializeGoogleSignIn() {
+    google.accounts.id.initialize({
+        client_id: document.querySelector('meta[name="google-signin-client_id"]').content,
+        callback: handleCredentialResponse
+    });
+    google.accounts.id.renderButton(
+        document.getElementById('g_id_signin'),
+        { theme: 'outline', size: 'large' }
+    );
+    // google.accounts.id.prompt(); // Optional: show one-tap login prompt
+}
+
+function handleCredentialResponse(response) {
+    const decodedToken = jwt_decode(response.credential);
+    currentUser = decodedToken.name || decodedToken.given_name || 'Google User';
+    
+    // UI updates
+    document.getElementById('g_id_signin').style.display = 'none';
+    document.getElementById('user-info').style.display = 'flex';
+    document.getElementById('user-avatar').src = decodedToken.picture || '';
+    document.getElementById('user-name-display').innerText = `Hi, ${currentUser}`;
+
+    if (!members.includes(currentUser)) {
+        members.push(currentUser);
+        orders[currentUser] = {};
+    }
+    
+    saveLocal();
+    renderTable();
+    calculateAll();
+    updateUserModeUI();
+}
+
+// Simple JWT decoder
+function jwt_decode(token) {
+    try {
+        return JSON.parse(atob(token.split('.')[1]));
+    } catch (e) {
+        return null;
+    }
+}
+
+function logout() {
+    currentUser = "";
+    document.getElementById('g_id_signin').style.display = 'block';
+    document.getElementById('user-info').style.display = 'none';
+    saveLocal();
+    renderTable();
+    calculateAll();
+    updateUserModeUI();
+}
+
+function loadLocalDataForStore() {
+    members = JSON.parse(localStorage.getItem(`menu_order_members_${currentStoreId}`)) || [];
+    orders = JSON.parse(localStorage.getItem(`menu_order_orders_${currentStoreId}`)) || {};
+    // currentUser is handled by Google Sign-In, so we don't load it from local storage anymore
+    MENU_DATA = ALL_MENUS[currentStoreId] ? ALL_MENUS[currentStoreId].data : [];
+}
+
+function saveLocal() {
+    localStorage.setItem(`menu_order_members_${currentStoreId}`, JSON.stringify(members));
+    localStorage.setItem(`menu_order_orders_${currentStoreId}`, JSON.stringify(orders));
+    localStorage.setItem("menu_order_current_store", currentStoreId);
+}
+
+function renderStoreSelect() {
+    const select = document.getElementById("store-select");
+    select.innerHTML = "";
+    for (const storeId in ALL_MENUS) {
+        const opt = document.createElement("option");
+        opt.value = storeId;
+        opt.innerText = ALL_MENUS[storeId].name;
+        if (storeId === currentStoreId) {
+            opt.selected = true;
+        }
+        select.appendChild(opt);
+    }
+}
+
+function switchStore() {
+    const newStore = document.getElementById("store-select").value;
+    if (newStore === currentStoreId) return;
+
+    currentStoreId = newStore;
+    
+    // Update URL to reflect the new store selection
+    const url = new URL(window.location);
+    url.searchParams.set('store', newStore);
+    window.history.pushState({}, '', url);
+
+    loadLocalDataForStore();
+    renderTable();
+    calculateAll();
+    updateBrand();
+    updateUserModeUI();
+    
+    if (GOOGLE_GAS_API_URL && !GOOGLE_GAS_API_URL.includes("YOUR_DEPLOY_ID")) {
+        fetchFromGoogleDrive(false);
+    }
+}
+
+function updateBrand() {
+    const storeInfo = ALL_MENUS[currentStoreId] || { name: "點餐" };
+    document.getElementById('store-brand-badge').innerText = storeInfo.name.substring(0, 2);
+    document.getElementById('store-title').innerText = `${storeInfo.name} - 多人點餐統計`;
+}
+
+function updateStatus(type, msg) {
+    const dot = document.getElementById("status-dot");
+    const text = document.getElementById("sync-status-text");
+    dot.className = `status-dot ${type}`;
+    text.innerText = msg;
+}
+
+function updateUserModeUI() {
+    const btnSubmit = document.getElementById("btn-submit-order");
+    if (!currentUser) {
+        updateStatus("offline", "請先登入 Google 帳號以開始點餐");
+        btnSubmit.disabled = true;
+        btnSubmit.innerText = "請先登入";
+    } else {
+        updateStatus("online", "僅可修改自己的點單，選完請按「送出」");
+        btnSubmit.disabled = false;
+        btnSubmit.innerText = "送出我的點餐";
+    }
+}
+
+function fetchFromGoogleDrive(isManual = false) {
+    if (isSubmitting) return;
+    if (!GOOGLE_GAS_API_URL || GOOGLE_GAS_API_URL.includes("YOUR_DEPLOY_ID")) {
+        if (isManual) alert("尚未設定 Google Apps Script 部署網址。");
+        return;
+    }
+    const storeName = ALL_MENUS[currentStoreId].name;
+    updateStatus("syncing", isManual ? `🔄 正在從雲端同步「${storeName}」的資料...` : "連線中...");
+
+    const fetchUrl = `${GOOGLE_GAS_API_URL}?storeId=${currentStoreId}&token=${encodeURIComponent(API_TOKEN)}`;
+
+    fetch(fetchUrl, { method: "GET", mode: "cors", redirect: "follow" })
+    .then(res => res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`)))
+    .then(res => {
+        if (res.status === "success") {
+            if (res.data && Object.keys(res.data).length > 0 && res.data.members) {
+                members = res.data.members;
+                orders = res.data.orders || {};
+                
+                // If the current user logged in but is not in the fetched member list, add them.
+                if(currentUser && !members.includes(currentUser)){
+                    members.push(currentUser);
+                    if(!orders[currentUser]) orders[currentUser] = {};
+                }
+
+                saveLocal();
+                renderTable();
+                calculateAll();
+            }
+            updateStatus("online", `✅ 「${storeName}」資料已同步 (${new Date().toLocaleTimeString()})`);
+        } else {
+            throw new Error(res.message || "後端回傳格式錯誤或密鑰驗證失敗");
+        }
+    })
+    .catch(err => {
+        console.warn("拉取失敗:", err);
+        updateStatus("offline", "❗️ 連線失敗或密鑰未對齊");
+    });
+}
+
+function submitMyOrderToCloud() {
+    if (!currentUser) return alert("請先登入 Google 帳號!");
+    if (!GOOGLE_GAS_API_URL || GOOGLE_GAS_API_URL.includes("YOUR_DEPLOY_ID")) {
+        return alert("請先在程式碼中的 GOOGLE_GAS_API_URL 填入您的 Google Apps Script 部署網址!");
+    }
+    const btn = document.getElementById("btn-submit-order");
+    btn.disabled = true;
+    btn.innerText = "正在傳送...";
+    updateStatus("syncing", "🔄 正在將點單送出至雲端...");
+    isSubmitting = true;
+
+    const payload = {
+        token: API_TOKEN,
+        action: "update_member",
+        storeId: currentStoreId,
+        storeName: ALL_MENUS[currentStoreId].name,
+        targetMember: currentUser,
+        memberOrders: orders[currentUser] || {},
+        members: members,
+        menuSummary: MENU_DATA
+    };
+
+    fetch(GOOGLE_GAS_API_URL, {
+        method: "POST",
+        mode: "cors",
+        redirect: "follow",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload)
+    })
+    .then(res => {
+        if (!res.ok) throw new Error(`HTTP 狀態碼: ${res.status}`);
+        return res.json();
+    })
+    .then(res => {
+        if (res.status === "success") {
+            if (res.mergedData) {
+                members = res.mergedData.members || members;
+                orders = res.mergedData.orders || orders;
+                saveLocal();
+                renderTable();
+                calculateAll();
+            }
+            updateStatus("online", `✅ 已成功送出! (${new Date().toLocaleTimeString()} 已存入試算表)`);
+            alert(`「${currentUser}」於「${ALL_MENUS[currentStoreId].name}」的點餐已成功更新至 Google 試算表!`);
+        } else {
+            throw new Error(res.message || "後端處理失敗");
+        }
+    })
+    .catch(err => {
+        console.error("送出失敗詳細資訊:", err);
+        updateStatus("offline", "❌ 送出失敗，資料已安全暫存在本機");
+        alert(`連線至 Google 失敗!\n錯誤原因: ${err.message}\n\n請檢查 GAS 權限、Token 設定與網址。`);
+    })
+    .finally(() => {
+        isSubmitting = false;
+        // Re-enable button only if user is still logged in
+        if (currentUser) {
+            btn.disabled = false;
+            btn.innerText = "送出我的點餐";
+        }
+    });
+}
+
+function renderTable() {
+    const headerRow = document.getElementById("table-header-row");
+    headerRow.innerHTML = `
+        <th class="sticky-col-1 col-category">分類</th>
+        <th class="sticky-col-2">品項名稱</th>
+        <th class="sticky-col-3">單價</th>
+    `;
+
+    members.forEach(m => {
+        const th = document.createElement("th");
+        
+        if (m === currentUser) {
+            th.className = "current-user-col";
+            th.innerHTML = `<span>${escapeHtml(m)} (我)</span>`;
+        } else {
+            th.className = "readonly-col";
+            th.innerHTML = `<span>${escapeHtml(m)}</span>`;
+        }
+        headerRow.appendChild(th);
+    });
+
+    headerRow.innerHTML += `
+        <th class="col-summary-qty">店家總量</th>
+        <th class="col-summary-amount">品項小計</th>
+    `;
+
+    const tbody = document.getElementById("matrix-tbody");
+    tbody.innerHTML = "";
+
+    MENU_DATA.forEach(item => {
+        const tr = document.createElement("tr");
+        let cellsHtml = `
+            <td class="sticky-col-1 col-category"><span class="badge-category">${item.category}</span></td>
+            <td class="sticky-col-2">${item.name}</td>
+            <td class="sticky-col-3">$${formatPrice(item.price)}</td>
+        `;
+
+        members.forEach(m => {
+            const qty = (orders[m] && orders[m][item.id]) ? orders[m][item.id] : 0;
+            if (m === currentUser) {
+                cellsHtml += `
+                    <td class="current-user-col">
+                        <div class="qty-control">
+                            <button class="qty-btn" onclick="changeQty('${item.id}', -1)">-</button>
+                            <input type="number" class="qty-input" min="0" max="99" value="${qty}" onchange="setQty('${item.id}', this.value)" />
+                            <button class="qty-btn" onclick="changeQty('${item.id}', 1)">+</button>
+                        </div>
+                    </td>
+                `;
+            } else {
+                const valClass = qty > 0 ? "readonly-val has-qty" : "readonly-val zero";
+                cellsHtml += `<td class="readonly-col"><span class="${valClass}">${qty > 0 ? qty : "-"}</span></td>`;
+            }
+        });
+
+        cellsHtml += `
+            <td class="col-summary-qty" id="row-qty-${item.id}">0</td>
+            <td class="col-summary-amount" id="row-amount-${item.id}">NT$ 0</td>
+        `;
+
+        tr.innerHTML = cellsHtml;
+        tbody.appendChild(tr);
+    });
+
+    renderFooter();
+}
+
+function renderFooter() {
+    const footRow = document.getElementById("table-foot-row");
+    let footHtml = `
+        <td class="sticky-col-1 col-category">統計</td>
+        <td class="sticky-col-2">個人應付總計</td>
+        <td class="sticky-col-3">-</td>
+    `;
+    members.forEach((m) => {
+        const colClass = (m === currentUser) ? "current-user-col" : "readonly-col";
+        const memberId = m.replace(/[^a-zA-Z0-9]/g, ''); // create a safe id
+        footHtml += `<td id="member-total-${memberId}" class="${colClass}">$0 (0項)</td>`;
+    });
+    footHtml += `
+        <td id="foot-total-qty" class="col-summary-qty">0</td>
+        <td id="foot-total-amount" class="col-summary-amount">NT$ 0</td>
+    `;
+    footRow.innerHTML = footHtml;
+}
+
+function changeQty(itemId, delta) {
+    if (!currentUser) return;
+    if (!orders[currentUser]) orders[currentUser] = {};
+    let current = Number(orders[currentUser][itemId] || 0);
+    orders[currentUser][itemId] = Math.max(0, current + delta);
+    saveLocal();
+    renderTable();
+    calculateAll();
+    showUnsavedHint();
+}
+
+function setQty(itemId, val) {
+    if (!currentUser) return;
+    if (!orders[currentUser]) orders[currentUser] = {};
+    let parsed = parseInt(val, 10);
+    orders[currentUser][itemId] = isNaN(parsed) || parsed < 0 ? 0 : parsed;
+    saveLocal();
+    calculateAll();
+    showUnsavedHint();
+}
+
+function showUnsavedHint() {
+    updateStatus("syncing", "🟡 本機已修改，選完請記得點擊「送出我的點餐」!");
+}
+
+function clearMyOrder() {
+    if (!currentUser) return alert("請先登入!");
+    const storeName = ALL_MENUS[currentStoreId].name;
+    if (confirm(`確定要將您在「${storeName}」已選的所有品項數量歸零嗎？`)) {
+        orders[currentUser] = {};
+        saveLocal();
+        renderTable();
+        calculateAll();
+        showUnsavedHint();
+    }
+}
+
+function calculateAll() {
+    let grandTotalQty = 0;
+    let grandTotalAmount = 0;
+    const storeInfo = ALL_MENUS[currentStoreId];
+    let unit = "份";
+    if (storeInfo.name.includes("串燒")) unit = "串";
+    if (storeInfo.name.includes("滷味")) unit = "樣";
+
+    MENU_DATA.forEach(item => {
+        let rowQty = 0;
+        members.forEach(m => {
+            if (orders[m] && orders[m][item.id]) rowQty += Number(orders[m][item.id]);
+        });
+        let rowAmount = rowQty * item.price;
+        grandTotalQty += rowQty;
+        grandTotalAmount += rowAmount;
+
+        const cellQty = document.getElementById(`row-qty-${item.id}`);
+        const cellAmount = document.getElementById(`row-amount-${item.id}`);
+        if (cellQty) cellQty.innerText = rowQty;
+        if (cellAmount) cellAmount.innerText = `NT$ ${formatAmount(rowAmount)}`;
+    });
+
+    members.forEach((m) => {
+        let mQty = 0;
+        let mAmount = 0;
+        MENU_DATA.forEach(item => {
+            const qty = (orders[m] && orders[m][item.id]) ? Number(orders[m][item.id]) : 0;
+            mQty += qty;
+            mAmount += qty * item.price;
+        });
+        const memberId = m.replace(/[^a-zA-Z0-9]/g, '');
+        const cell = document.getElementById(`member-total-${memberId}`);
+        if (cell) {
+            cell.innerHTML = `<strong>NT$ ${formatAmount(mAmount)}</strong><br><span style="font-size:0.75rem">(${mQty}項)</span>`;
+        }
+    });
+
+    document.getElementById("grand-total-amount").innerText = `NT$ ${formatAmount(grandTotalAmount)}`;
+    document.getElementById("grand-total-qty").innerText = `${grandTotalQty} ${unit}`;
+    document.getElementById("total-members-count").innerText = `${members.length} 人`;
+
+    const footQty = document.getElementById("foot-total-qty");
+    const footAmount = document.getElementById("foot-total-amount");
+    if (footQty) footQty.innerText = grandTotalQty;
+    if (footAmount) footAmount.innerText = `NT$ ${formatAmount(grandTotalAmount)}`;
+}
+
+
+function openKitchenModal() {
+    const container = document.getElementById("kitchen-list-body");
+    container.innerHTML = "";
+    let hasItems = false;
+    let currentCategory = "";
+
+    MENU_DATA.forEach(item => {
+        let totalQty = 0;
+        members.forEach(m => {
+            if (orders[m] && orders[m][item.id]) totalQty += Number(orders[m][item.id]);
+        });
+
+        if (totalQty > 0) {
+            hasItems = true;
+            if (item.category !== currentCategory) {
+                currentCategory = item.category;
+                const catHeader = document.createElement("div");
+                catHeader.style.cssText = "font-weight:bold; color:var(--accent-orange); margin-top:10px; margin-bottom: 5px; border-bottom: 1px solid #444; padding-bottom: 3px;";
+                catHeader.innerText = `【${currentCategory}】`;
+                container.appendChild(catHeader);
+            }
+            const chip = document.createElement("div");
+            chip.className = "order-item-chip";
+            chip.innerHTML = `
+                <span>${item.name} ($${formatPrice(item.price)}/${item.unit})</span>
+                <span style="font-weight:bold; font-size:1.1rem; color:var(--accent-yellow);">${totalQty} ${item.unit}</span>`;
+            container.appendChild(chip);
+        }
+    });
+
+    if (!hasItems) {
+        container.innerHTML = `<div style="text-align:center; color:#9ca3af; padding:30px;">目前尚未點選任何品項!</div>`;
+    }
+    document.getElementById("kitchen-modal").style.display = "flex";
+}
+
+function openShareModal() {
+    const storeName = ALL_MENUS[currentStoreId].name;
+    let text = `【${storeName} 點餐明細與收款分攤】\n- - - - - - - - - - - - - - - - -\n`;
+    let grandTotal = 0;
+    let totalQty = 0;
+
+    members.forEach(m => {
+        let mTotal = 0;
+        let mCount = 0;
+        let detailList = [];
+        MENU_DATA.forEach(item => {
+            const qty = (orders[m] && orders[m][item.id]) ? Number(orders[m][item.id]) : 0;
+            if (qty > 0) {
+                mTotal += qty * item.price;
+                mCount += qty;
+                detailList.push(`${item.name} x${qty}`);
+            }
+        });
+
+        grandTotal += mTotal;
+        totalQty += mCount;
+        text += `● ${m}: 應付 NT$ ${formatAmount(mTotal)} (${mCount}項)\n`;
+        text += detailList.length > 0 ? `  明細: ${detailList.join("、")}\n\n` : `  明細: (無點餐)\n\n`;
+    });
+
+    const storeInfo = ALL_MENUS[currentStoreId];
+    let unit = "份";
+    if (storeInfo.name.includes("串燒")) unit = "串";
+    if (storeInfo.name.includes("滷味")) unit = "樣";
+
+    text += `- - - - - - - - - - - - - - - - -\n💰 全桌總金額: NT$ ${formatAmount(grandTotal)}\n📦 總數量: ${totalQty} ${unit}\n`;
+    document.getElementById("share-text-area").value = text;
+    document.getElementById("share-modal").style.display = "flex";
+}
+
+function closeModal(id) { document.getElementById(id).style.display = "none"; }
+
+function copyShareText() {
+    const textarea = document.getElementById("share-text-area");
+    textarea.select();
+    navigator.clipboard.writeText(textarea.value).then(() => {
+        alert("已複製 LINE 對帳明細!");
+    });
+}
+
+function escapeHtml(string) {
+    return String(string).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+</script>
+</body>
+</html>
