@@ -3,8 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>多店家多人點餐系統 - menu_order</title>
-<!-- 引入 Google Identity Services (GSI) SDK -->
+<!-- 安全防護：Content Security Policy (CSP) -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' 'unsafe-inline' https://accounts.google.com https://apis.google.com;
+  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+  font-src 'self' https://fonts.gstatic.com;
+  img-src 'self' data: https://lh3.googleusercontent.com https://ui-avatars.com;
+  connect-src 'self' https://script.google.com https://script.googleusercontent.com https://oauth2.googleapis.com;
+  frame-src https://accounts.google.com;
+">
+<title>多店家多人點餐系統 - menu_order (機密防護版)</title>
+<!-- 引入 Google Identity Services (GIS) SDK -->
 <script src="https://accounts.google.com/gsi/client" async defer onload="initGoogleSignIn()"></script>
 <style>
 :root {
@@ -156,22 +166,22 @@ tfoot td.sticky-col-1, tfoot td.sticky-col-2, tfoot td.sticky-col-3 { background
   font-size: 0.88rem;
 }
 .locked-banner {
-    background-color: #5a1d1d;
-    border: 1px solid var(--accent-red);
-    color: #fca5a5;
-    text-align: center;
-    font-weight: bold;
+  background-color: #5a1d1d;
+  border: 1px solid var(--accent-red);
+  color: #fca5a5;
+  text-align: center;
+  font-weight: bold;
 }
 .admin-panel {
-    background-color: #1f2937;
-    border: 1px solid var(--accent-yellow);
-    border-radius: 8px;
-    padding: 10px 14px;
-    margin-bottom: 14px;
-    display: none;
-    flex-wrap: wrap;
-    gap: 10px;
-    align-items: center;
+  background-color: #1f2937;
+  border: 1px solid var(--accent-yellow);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  display: none;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
 }
 .admin-panel-title { color: var(--accent-yellow); font-weight: bold; font-size: 0.9rem; margin-right: 10px;}
 
@@ -202,22 +212,20 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
 <body>
 <div class="container" id="main-container">
 
-    <!-- 訪客/未登入提示 -->
     <div class="banner-notice" id="login-notice-banner">
-        <span>💡 <strong>瀏覽模式中</strong>：您可隨時切換上方店家瀏覽菜單。如欲點餐或送出，請點擊「Google 登入」或使用「快速訪客模式」。</span>
+        <span>💡 <strong>瀏覽模式中</strong>：切換上方店家可瀏覽菜單。如欲點餐送出，請點擊「Google 登入」或使用「快速訪客模式」。</span>
         <button class="btn-secondary" onclick="enterGuestMode()">訪客點餐測試</button>
     </div>
-    
-    <!-- 菜單鎖定提示 -->
+
     <div class="banner-notice locked-banner" id="locked-notice-banner" style="display: none;">
-        <span>🔒 此店家已結單，菜單已被管理員鎖定，無法再進行任何點餐或修改。</span>
+        <span>🔒 此店家已結單，菜單已被管理員鎖定，無法再進行點餐或修改。</span>
     </div>
 
     <div class="submit-panel">
         <div class="submit-left">
             <span class="submit-badge">選擇店家</span>
             <select id="store-select" class="select-store" onchange="switchStore()"></select>
-            
+
             <div id="google-login-container">
                 <div id="g_id_signin"></div>
                 <button id="btn-manual-login" class="btn-primary" style="display:none;" onclick="triggerGoogleSignIn()">Google 登入</button>
@@ -227,22 +235,22 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
                     <button class="btn-secondary" onclick="logout()">登出</button>
                 </div>
             </div>
-            
+
             <button class="btn-submit-main" id="btn-submit-order" onclick="submitMyOrderToCloud()" disabled>送出我的點餐</button>
             <button class="btn-secondary" onclick="fetchFromGoogleDrive(true)">重新整理</button>
         </div>
         <div class="sync-status-indicator">
             <span class="status-dot" id="status-dot"></span>
-            <span id="sync-status-text">菜單已就緒，請登入開始點餐</span>
+            <span id="sync-status-text">菜單就緒，請登入開始點餐</span>
         </div>
     </div>
 
-    <!-- Admin Panel -->
+    <!-- Admin Panel (預設隱藏，僅登入後經後端確認為管理員才動態呈現) -->
     <div class="admin-panel" id="admin-controls-panel">
         <span class="admin-panel-title">⭐ 管理員面板</span>
-        <button class="btn-danger" id="btn-admin-lock" onclick="adminLockMenu()">🔒 結單 (鎖定此菜單)</button>
-        <button class="btn-success" id="btn-admin-unlock" onclick="adminUnlockMenu()" style="display: none;">🔓 解鎖此菜單</button>
-        <button class="btn-danger-outline" onclick="adminClearAllOrders()">🗑️ 一鍵清除所有人訂單</button>
+        <button class="btn-danger" id="btn-admin-lock" onclick="adminLockMenu()">🔒 結單 (鎖定菜單)</button>
+        <button class="btn-success" id="btn-admin-unlock" onclick="adminUnlockMenu()" style="display: none;">🔓 解鎖菜單</button>
+        <button class="btn-danger-outline" onclick="adminClearAllOrders()">🔄 重啟訂單</button>
     </div>
 
     <header>
@@ -326,26 +334,25 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
 
 <script>
 // ===================================================================
-// ======== CONFIGURATION ============================================
+// ======== 公開設定參數 (無任何敏感密鑰或名單) =========================
 // ===================================================================
-const _B64_GAS_URL = "aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3Mvcy9BS2Z5Y2J3LTVQX04xWVJxMlB5c3Q2cUw2LXRpNkp4VFE5dmNHMFN6aWZYMXdQRmdsazUwRXZvRVFTaTlYeFNkcEdyUG82M0QvZXhlYw==";
-const _B64_API_TOKEN = "TXlTdVAzclMzY1IzdFQwa0VuMjAyNCE=";
-const GOOGLE_CLIENT_ID = "332175692979-nkrni08k8fleg7te2uju417rmc207vlv.apps.googleusercontent.com"; 
-const ADMIN_ACCOUNTS = ["jim.hsu@infotimes.com.tw", "roye.tu@infotimes.com.tw"];
+// GAS API URL
+const GOOGLE_GAS_API_URL = "https://script.google.com/macros/s/AKfycbw-5P_N1YRq2Pyst6qL6-ti6JxTQ9vcG0SzifX1wPFglk50EvoEQSi9XxSdpGrPo63D/exec";
 
-// 核心常數
-const GOOGLE_GAS_API_URL = atob(_B64_GAS_URL);
-const API_TOKEN = atob(_B64_API_TOKEN);
+// Google Cloud Console OAuth Client ID
+const GOOGLE_CLIENT_ID = "332175692979-nkrni08k8fleg7te2uju417rmc207vlv.apps.googleusercontent.com"; 
 
 // ===============================================
-// ======== CORE LOGIC ===========================
+// ======== 核心狀態與邏輯 =========================
 // ===============================================
 let ALL_STORES = {};
 let MENU_DATA = [];
 let members = [];
 let orders = {};
 let currentUser = "";
-let currentUserEmail = "";
+let currentIdToken = "";
+let isGuestModeActive = false;
+let isCurrentUserAdmin = false; // 由後端查驗後回傳，前端不硬編碼名單
 let currentStoreId = "";
 let isSubmitting = false;
 let isMenuLocked = false;
@@ -381,34 +388,31 @@ window.onload = async function() {
     updateStatus("syncing", "正在取得店家列表...");
     try {
         await loadStoreList();
-        
+
         const urlParams = new URLSearchParams(window.location.search);
         const storeFromUrl = urlParams.get('store');
 
         currentStoreId = storeFromUrl && ALL_STORES[storeFromUrl] 
             ? storeFromUrl 
             : localStorage.getItem("menu_order_current_store") || Object.keys(ALL_STORES)[0];
-        
+
         if (!currentStoreId) {
-             updateStatus("offline", "錯誤：找不到任何店家。請確認試算表中有 'MENU_xxx' 分頁。");
+             updateStatus("offline", "找不到任何店家。請確認試算表中有 'MENU_xxx' 分頁。");
              alert("錯誤：找不到任何店家。請確認 Google Sheet 中有名為 'MENU_xxx' 的分頁。");
              return;
         }
-        
+
         init();
 
     } catch (error) {
         console.error("初始化失敗:", error);
         updateStatus("offline", "初始化失敗：" + error.message);
-        alert("頁面初始化失敗：" + error.message + "\n\n請確認 Google Apps Script 是否已發布為「所有人 (Anyone)」皆可存取。");
+        alert("頁面初始化失敗：" + error.message);
     }
 };
 
 async function loadStoreList() {
-    if (!GOOGLE_GAS_API_URL || GOOGLE_GAS_API_URL.includes("YOUR_DEPLOY_ID")) {
-        throw new Error("後端 API 未設定。");
-    }
-    const resp = await fetch(`${GOOGLE_GAS_API_URL}?action=get_stores&token=${encodeURIComponent(API_TOKEN)}`, {
+    const resp = await fetch(`${GOOGLE_GAS_API_URL}?action=get_stores`, {
         method: "GET",
         redirect: "follow"
     });
@@ -444,7 +448,7 @@ function initGoogleSignIn() {
                 callback: handleCredentialResponse,
                 auto_select: false
             });
-            
+
             const btnContainer = document.getElementById('g_id_signin');
             if (btnContainer) {
                 google.accounts.id.renderButton(btnContainer, { theme: 'outline', size: 'medium', text: 'signin_with', shape: 'pill' });
@@ -471,15 +475,18 @@ function triggerGoogleSignIn() {
     }
 }
 
-function handleCredentialResponse(response) {
-    const decodedToken = jwt_decode(response.credential);
+async function handleCredentialResponse(response) {
+    currentIdToken = response.credential;
+    isGuestModeActive = false;
+
+    const decodedToken = jwt_decode(currentIdToken);
     if (!decodedToken) {
         alert("登入憑證解析失敗!");
         return;
     }
+
     currentUser = decodedToken.name || decodedToken.given_name || decodedToken.email.split('@')[0];
-    currentUserEmail = decodedToken.email;
-    
+
     document.getElementById('g_id_signin').style.display = 'none';
     document.getElementById('btn-manual-login').style.display = 'none';
     document.getElementById('user-info').style.display = 'flex';
@@ -491,48 +498,91 @@ function handleCredentialResponse(response) {
         members.push(currentUser);
         if (!orders[currentUser]) orders[currentUser] = {};
     }
-    
+
     saveLocal();
     renderTable();
     calculateAll();
     updateUserModeUI();
     updateStatus("online", `已登入：${currentUser}`);
-    checkAdminStatus();
+
+    // 向後端非同步驗證管理員身份
+    await verifyUserRoleWithBackend(currentIdToken);
+}
+
+/**
+ * 伺服端角色查詢：發送 Token 詢問後端當前登入者是否具備管理員權限
+ */
+async function verifyUserRoleWithBackend(token) {
+    try {
+        const resp = await fetch(GOOGLE_GAS_API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({ action: "check_user_role", idToken: token }),
+            redirect: "follow"
+        });
+        const res = await resp.json();
+        if (res.status === "success" && res.data.isAdmin) {
+            isCurrentUserAdmin = true;
+            renderAdminPanelUI();
+        } else {
+            isCurrentUserAdmin = false;
+            document.getElementById('admin-controls-panel').style.display = 'none';
+        }
+    } catch (e) {
+        console.warn("無法取得使用者權限角色", e);
+    }
+}
+
+function renderAdminPanelUI() {
+    const adminPanel = document.getElementById('admin-controls-panel');
+    if (isCurrentUserAdmin) {
+        adminPanel.style.display = 'flex';
+        document.getElementById('btn-admin-lock').style.display = isMenuLocked ? 'none' : 'inline-flex';
+        document.getElementById('btn-admin-unlock').style.display = isMenuLocked ? 'inline-flex' : 'none';
+    } else {
+        adminPanel.style.display = 'none';
+    }
 }
 
 function enterGuestMode() {
-    const name = prompt("請輸入您的點餐暱稱/姓名：", "訪客");
+    const name = prompt("請輸入您的點餐暱稱/姓名（訪客模式）：", "訪客");
     if (!name || !name.trim()) return;
-    
+
     currentUser = name.trim();
-    currentUserEmail = "";
+    currentIdToken = "";
+    isGuestModeActive = true;
+    isCurrentUserAdmin = false;
+
     document.getElementById('g_id_signin').style.display = 'none';
     document.getElementById('btn-manual-login').style.display = 'none';
     document.getElementById('user-info').style.display = 'flex';
     document.getElementById('user-avatar').src = "https://ui-avatars.com/api/?name=" + encodeURIComponent(currentUser) + "&background=3b82f6&color=fff";
     document.getElementById('user-name-display').innerText = `訪客: ${currentUser}`;
     document.getElementById('login-notice-banner').style.display = 'none';
+    document.getElementById('admin-controls-panel').style.display = 'none';
 
     if (!members.includes(currentUser)) {
         members.push(currentUser);
         if (!orders[currentUser]) orders[currentUser] = {};
     }
-    
+
     saveLocal();
     renderTable();
     calculateAll();
     updateUserModeUI();
-    checkAdminStatus();
 }
 
 function logout() {
     currentUser = "";
-    currentUserEmail = "";
+    currentIdToken = "";
+    isGuestModeActive = false;
+    isCurrentUserAdmin = false;
+
     document.getElementById('g_id_signin').style.display = 'block';
     document.getElementById('user-info').style.display = 'none';
     document.getElementById('login-notice-banner').style.display = 'flex';
     document.getElementById('admin-controls-panel').style.display = 'none';
-    
+
     saveLocal();
     renderTable();
     calculateAll();
@@ -563,10 +613,9 @@ function switchStore() {
     MENU_DATA = [];
     members = [];
     orders = {};
-    
+
     renderTable();
     updateBrand();
-    
     fetchFromGoogleDrive(false);
 }
 
@@ -599,17 +648,6 @@ function updateStatus(type, msg) {
     text.innerText = msg;
 }
 
-function checkAdminStatus() {
-    const adminPanel = document.getElementById('admin-controls-panel');
-    if (currentUserEmail && ADMIN_ACCOUNTS.includes(currentUserEmail)) {
-        adminPanel.style.display = 'flex';
-        document.getElementById('btn-admin-lock').style.display = isMenuLocked ? 'none' : 'inline-flex';
-        document.getElementById('btn-admin-unlock').style.display = isMenuLocked ? 'inline-flex' : 'none';
-    } else {
-        adminPanel.style.display = 'none';
-    }
-}
-
 function updateUserModeUI() {
     const btnSubmit = document.getElementById('btn-submit-order');
     const btnClearMyOrder = document.getElementById('btn-clear-my-order');
@@ -621,11 +659,7 @@ function updateUserModeUI() {
     } else {
         btnSubmit.disabled = true;
         btnClearMyOrder.disabled = true;
-        if (isMenuLocked) {
-            btnSubmit.innerText = "已結單鎖定";
-        } else {
-            btnSubmit.innerText = "請先登入後送出";
-        }
+        btnSubmit.innerText = isMenuLocked ? "已結單鎖定" : "請先登入後送出";
     }
 }
 
@@ -633,7 +667,7 @@ async function fetchFromGoogleDrive(isManual = false) {
     if (!GOOGLE_GAS_API_URL) return;
     updateStatus("syncing", "正在從雲端讀取最新資料...");
     try {
-        const resp = await fetch(`${GOOGLE_GAS_API_URL}?storeId=${currentStoreId}&token=${encodeURIComponent(API_TOKEN)}`, {
+        const resp = await fetch(`${GOOGLE_GAS_API_URL}?storeId=${encodeURIComponent(currentStoreId)}`, {
             method: "GET",
             redirect: "follow"
         });
@@ -646,7 +680,7 @@ async function fetchFromGoogleDrive(isManual = false) {
                 console.warn(data.warning);
                 alert(data.warning);
             }
-            
+
             members = data.members || [];
             orders = data.orders || {};
             isMenuLocked = data.isLocked || false;
@@ -663,7 +697,7 @@ async function fetchFromGoogleDrive(isManual = false) {
             renderTable();
             calculateAll();
             updateUserModeUI();
-            checkAdminStatus();
+            renderAdminPanelUI();
             updateStatus("online", `同步成功 (${new Date().toLocaleTimeString('zh-TW')})`);
 
         } else {
@@ -682,7 +716,7 @@ function renderTable() {
     const tbody = document.getElementById("matrix-tbody");
 
     while (theadRow.children.length > 3) theadRow.removeChild(theadRow.children[3]);
-    
+
     members.forEach(member => {
         const th = document.createElement("th");
         th.innerText = member;
@@ -765,7 +799,7 @@ function updateQty(itemId, delta) {
     if (!orders[currentUser]) orders[currentUser] = {};
     let currentVal = Number(orders[currentUser][itemId] || 0);
     currentVal = Math.max(0, currentVal + delta);
-    
+
     if (currentVal === 0) delete orders[currentUser][itemId];
     else orders[currentUser][itemId] = currentVal;
 
@@ -812,27 +846,29 @@ function calculateAll() {
     document.getElementById("total-members-count").innerText = `${members.length} 人`;
 }
 
+/**
+ * 提交個人訂單至雲端
+ */
 async function submitMyOrderToCloud() {
     if (!currentUser) { alert("請先登入！"); return; }
     if (isSubmitting) return;
 
     isSubmitting = true;
-    updateStatus("syncing", "正在寫入雲端...");
+    updateStatus("syncing", "正在向雲端寫入訂單...");
     document.getElementById("btn-submit-order").disabled = true;
 
     try {
         const payload = {
-            token: API_TOKEN,
             action: "update_member",
             storeId: currentStoreId,
             storeName: ALL_STORES[currentStoreId]?.name || currentStoreId,
+            idToken: currentIdToken,
+            isGuest: isGuestModeActive,
             targetMember: currentUser,
-            userEmail: currentUserEmail,
             memberOrders: orders[currentUser] || {},
             menuSummary: MENU_DATA.map(i => ({ id: i.id, category: i.category, name: i.name, price: i.price }))
         };
 
-        // 使用 text/plain 避免觸發額外的 CORS preflight (OPTIONS)，並開啟 redirect follow
         const resp = await fetch(GOOGLE_GAS_API_URL, {
             method: "POST",
             headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -851,28 +887,33 @@ async function submitMyOrderToCloud() {
     } catch (err) {
         console.error(err);
         updateStatus("offline", "送出失敗：" + err.message);
-        alert(`送出失敗：${err.message}\n\n請檢查 Google Apps Script 權限是否設為「所有人 (Anyone)」，並確認發布為最新版本。`);
+        alert(`送出失敗：${err.message}`);
     } finally {
         isSubmitting = false;
         updateUserModeUI();
     }
 }
 
+/**
+ * 管理員操作 (結單/解鎖/重啟)
+ */
 async function adminAction(action, confirmMsg) {
-    if (!currentUserEmail || !ADMIN_ACCOUNTS.includes(currentUserEmail)) { alert("權限不足！"); return; }
+    if (!currentIdToken) {
+        alert("此操作需要管理員權限，請先透過 Google 帳號登入！");
+        return;
+    }
     if (isSubmitting) return;
     if (confirmMsg && !confirm(confirmMsg)) return;
-    
+
     isSubmitting = true;
-    updateStatus("syncing", "正在執行管理員操作...");
-    
+    updateStatus("syncing", "正在向後端驗證管理員授權...");
+
     try {
         const payload = {
-            token: API_TOKEN,
             action: action,
             storeId: currentStoreId,
             storeName: ALL_STORES[currentStoreId]?.name || currentStoreId,
-            userEmail: currentUserEmail,
+            idToken: currentIdToken,
             menuSummary: MENU_DATA.map(i => ({ id: i.id, category: i.category, name: i.name, price: i.price }))
         };
 
@@ -885,7 +926,7 @@ async function adminAction(action, confirmMsg) {
 
         const resJson = await resp.json();
         if (resJson.status === "success") {
-            updateStatus("online", "管理員操作成功！");
+            updateStatus("online", "管理員操作授權成功並完成！");
             alert("✅ 操作成功！");
             await fetchFromGoogleDrive(false);
         } else {
@@ -910,12 +951,15 @@ function clearMyOrder() {
     }
 }
 
+/**
+ * 管理員「重啟訂單」：清空點餐資料並自動解鎖菜單
+ */
 function adminClearAllOrders() {
-    const promptResponse = prompt("危險操作！此動作將清除此店家【所有人員】的點餐資料且無法復原！\n\n請輸入 `CLEAR` 確認執行：");
-    if (promptResponse === "CLEAR") {
+    const promptResponse = prompt("⚠️ 注意：此動作將清空此店家【所有同仁的點餐資料】並【自動解鎖菜單】重新開放點餐！\n\n請輸入 `RESET` 確認執行：");
+    if (promptResponse === "RESET") {
         adminAction('admin_clear_all', null);
     } else if (promptResponse !== null) {
-        alert("輸入錯誤，操作已取消。");
+        alert("輸入代碼不符，操作已取消。");
     }
 }
 
