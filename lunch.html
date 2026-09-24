@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- 安全防護：CSP 政策 (完整相容 GIS 與 Google 資源) -->
+<!-- 安全防護：CSP 政策 (相容 GIS 與 Google 相關資源) -->
 <meta http-equiv="Content-Security-Policy" content="
   default-src 'self';
   script-src 'self' 'unsafe-inline' https://accounts.google.com https://apis.google.com;
@@ -228,7 +228,7 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
 
             <div id="google-login-container">
                 <div id="g_id_signin"></div>
-                <button id="btn-manual-login" class="btn-primary" style="display:none;" onclick="triggerGoogleSignIn()">🔑 Google 登入</button>
+                <button id="btn-manual-login" class="btn-primary" style="display:none;" onclick="triggerGoogleSignIn()">🔑 重新授權 / 登入</button>
                 <div id="user-info">
                     <img id="user-avatar" src="" alt="avatar">
                     <span id="user-name-display"></span>
@@ -383,10 +383,21 @@ function jwt_decode(token) {
     }
 }
 
+/**
+ * 檢查當前 Token 是否依然有效 (預留 60 秒緩衝時間)
+ */
+function isTokenValid(token) {
+    if (!token) return false;
+    const decoded = jwt_decode(token);
+    if (!decoded || !decoded.exp) return false;
+    const nowSec = Math.floor(Date.now() / 1000);
+    return decoded.exp > (nowSec + 60);
+}
+
 window.onload = async function() {
     updateStatus("syncing", "正在載入店家列表...");
     try {
-        // 1. 先嘗試還原先前登入狀態 (解決 Ctrl + F5 被登出的問題)
+        // 1. 還原先前的登入狀態
         restoreSessionFromStorage();
 
         // 2. 載入店家列表
@@ -423,16 +434,11 @@ function restoreSessionFromStorage() {
         const savedAvatar = localStorage.getItem("menu_order_current_avatar");
 
         if (savedToken && savedUser) {
-            const decoded = jwt_decode(savedToken);
-            const now = Math.floor(Date.now() / 1000);
-
-            // 若 Token 仍在有效期內 (或寬限 5 分鐘)
-            if (decoded && decoded.exp && decoded.exp > now) {
+            if (isTokenValid(savedToken)) {
                 currentIdToken = savedToken;
                 currentUser = savedUser;
-                currentUserEmail = savedEmail || decoded.email || "";
+                currentUserEmail = savedEmail || "";
 
-                // 立即更新 UI
                 document.getElementById('g_id_signin').style.display = 'none';
                 document.getElementById('btn-manual-login').style.display = 'none';
                 document.getElementById('user-info').style.display = 'flex';
@@ -440,11 +446,13 @@ function restoreSessionFromStorage() {
                 document.getElementById('user-name-display').innerText = `${currentUser}`;
                 document.getElementById('login-notice-banner').style.display = 'none';
 
-                // 立即查核管理員
                 checkAdminIdentityQuick(currentUserEmail);
                 verifyUserRoleWithBackend(currentIdToken);
             } else {
-                clearSessionStorage();
+                console.warn("本機 Token 已過期，需重新登入刷新憑證。");
+                // 標記需要刷新，但保留頭像與名稱給予友善提示
+                document.getElementById('btn-manual-login').style.display = 'inline-flex';
+                document.getElementById('btn-manual-login').innerText = "🔑 憑證過期，請點此重新登入";
             }
         }
     } catch (e) {
@@ -543,7 +551,7 @@ async function handleCredentialResponse(response) {
     currentUserEmail = decodedToken.email || "";
     const avatarUrl = decodedToken.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser)}&background=3b82f6&color=fff`;
 
-    // 儲存至 localStorage 持久化
+    // 儲存至 localStorage
     localStorage.setItem("menu_order_id_token", currentIdToken);
     localStorage.setItem("menu_order_current_user", currentUser);
     localStorage.setItem("menu_order_current_email", currentUserEmail);
@@ -576,13 +584,9 @@ async function handleCredentialResponse(response) {
     verifyUserRoleWithBackend(currentIdToken);
 }
 
-/**
- * 快速前端特徵檢查（確保面板第一時間無縫呈現，後端動作仍受強制授權檢驗保護）
- */
 function checkAdminIdentityQuick(email) {
     if (!email) return;
     const emailLower = email.toLowerCase().trim();
-    // 預設常見組織管理者匹配
     if (emailLower.startsWith("jim.hsu@") || emailLower.startsWith("roye.tu@")) {
         isCurrentUserAdmin = true;
         renderAdminPanelUI();
@@ -604,7 +608,7 @@ async function verifyUserRoleWithBackend(token) {
             renderAdminPanelUI();
         }
     } catch (e) {
-        console.warn("向後端核對角色連線略過，維持現有權限標記", e);
+        console.warn("核對角色略過，維持現有標記", e);
     }
 }
 
@@ -931,6 +935,12 @@ async function submitMyOrderToCloud() {
     if (!currentUser) { alert("請先登入！"); return; }
     if (isSubmitting) return;
 
+    if (!isGuestModeActive && !isTokenValid(currentIdToken)) {
+        alert("登入憑證已過期，請點擊「重新登入」刷新憑證後再送出！");
+        triggerGoogleSignIn();
+        return;
+    }
+
     isSubmitting = true;
     updateStatus("syncing", "正在寫入訂單...");
     document.getElementById("btn-submit-order").disabled = true;
@@ -975,8 +985,17 @@ async function submitMyOrderToCloud() {
 async function adminAction(action, confirmMsg) {
     if (!currentIdToken) {
         alert("此操作需要管理員權限，請先透過 Google 帳號登入！");
+        triggerGoogleSignIn();
         return;
     }
+
+    // 檢查 Token 是否仍在有效期限內
+    if (!isTokenValid(currentIdToken)) {
+        alert("⚠️ 您的 Google 登入憑證已超過 1 小時有效期限，請先重新點擊登入以獲取新憑證！");
+        triggerGoogleSignIn();
+        return;
+    }
+
     if (isSubmitting) return;
     if (confirmMsg && !confirm(confirmMsg)) return;
 
