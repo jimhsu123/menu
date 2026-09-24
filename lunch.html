@@ -87,6 +87,16 @@ body {
   transform: translateY(-1px);
 }
 .btn-submit-main:disabled { background: #4b5563; cursor: not-allowed; box-shadow: none; opacity: 0.6; }
+.order-note-input { width: min(360px, 72vw); background-color: #272c36; border: 1px solid #4b5563; color: white; padding: 7px 10px; border-radius: 6px; font-size: 0.9rem; outline: none; }
+.order-note-input:focus { border-color: var(--accent-blue); }
+.order-note-input:disabled { opacity: 0.6; cursor: not-allowed; }
+.order-note-row { width: 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.order-note-label { font-size: 0.82rem; color: #cbd5e1; font-weight: 600; }
+.order-notes-panel { margin-bottom: 14px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px 14px; }
+.order-notes-title { font-weight: 700; margin-bottom: 6px; color: #e5e7eb; }
+.order-note-item { padding: 6px 0; border-bottom: 1px solid var(--border-color); font-size: 0.88rem; }
+.order-note-item:last-child { border-bottom: none; }
+.order-note-name { color: #93c5fd; font-weight: 700; margin-right: 8px; }
 .sync-status-indicator { font-size: 0.82rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px; }
 .status-dot { width: 10px; height: 10px; border-radius: 50%; background-color: var(--accent-green); flex-shrink: 0; }
 .status-dot.syncing { background-color: var(--accent-yellow); animation: pulse 1s infinite; }
@@ -238,6 +248,10 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
 
             <button class="btn-submit-main" id="btn-submit-order" onclick="submitMyOrderToCloud()" disabled>送出我的點餐</button>
             <button class="btn-secondary" onclick="fetchFromGoogleDrive(true)">重新整理</button>
+            <div class="order-note-row">
+                <span class="order-note-label">訂單備註</span>
+                <input id="order-note-input" class="order-note-input" type="text" maxlength="200" placeholder="例如：不要辣、12:30 前送達、餐具不用附" disabled>
+            </div>
         </div>
         <div class="sync-status-indicator">
             <span class="status-dot" id="status-dot"></span>
@@ -274,6 +288,11 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
             <button class="btn-secondary" onclick="openKitchenModal()">店家劃單彙整</button>
             <button class="btn-success" onclick="openShareModal()">複製 LINE 明細</button>
         </div>
+    </div>
+
+    <div class="order-notes-panel" id="order-notes-panel" style="display:none;">
+        <div class="order-notes-title">📝 訂單備註</div>
+        <div id="order-notes-list"></div>
     </div>
 
     <div class="table-container">
@@ -346,6 +365,7 @@ let ALL_STORES = {};
 let MENU_DATA = [];
 let members = [];
 let orders = {};
+let orderNotes = {};
 let currentUser = "";
 let currentUserEmail = "";
 let currentIdToken = "";
@@ -485,6 +505,7 @@ function init() {
     loadLocalDataForStore();
     renderTable(); 
     calculateAll();
+    renderOrderNotes();
     updateBrand();
     updateUserModeUI();
     renderAdminPanelUI();
@@ -678,11 +699,13 @@ function logout() {
 function loadLocalDataForStore() {
     members = JSON.parse(localStorage.getItem(`menu_order_members_${currentStoreId}`)) || [];
     orders = JSON.parse(localStorage.getItem(`menu_order_orders_${currentStoreId}`)) || {};
+    orderNotes = JSON.parse(localStorage.getItem(`menu_order_notes_${currentStoreId}`)) || {};
 }
 
 function saveLocal() {
     localStorage.setItem(`menu_order_members_${currentStoreId}`, JSON.stringify(members));
     localStorage.setItem(`menu_order_orders_${currentStoreId}`, JSON.stringify(orders));
+    localStorage.setItem(`menu_order_notes_${currentStoreId}`, JSON.stringify(orderNotes));
     localStorage.setItem("menu_order_current_store", currentStoreId);
 }
 
@@ -698,6 +721,7 @@ function switchStore() {
     MENU_DATA = [];
     members = [];
     orders = {};
+    orderNotes = {};
 
     renderTable();
     updateBrand();
@@ -736,14 +760,17 @@ function updateStatus(type, msg) {
 function updateUserModeUI() {
     const btnSubmit = document.getElementById('btn-submit-order');
     const btnClearMyOrder = document.getElementById('btn-clear-my-order');
+    const noteInput = document.getElementById('order-note-input');
 
     if (currentUser && !isMenuLocked) {
         btnSubmit.disabled = false;
         btnSubmit.innerText = `送出 ${currentUser} 的點餐`;
         btnClearMyOrder.disabled = false;
+        if (noteInput) { noteInput.disabled = false; noteInput.value = orderNotes[currentUser] || ""; }
     } else {
         btnSubmit.disabled = true;
         btnClearMyOrder.disabled = true;
+        if (noteInput) noteInput.disabled = true;
         btnSubmit.innerText = isMenuLocked ? "已結單鎖定" : "請先登入後送出";
     }
 }
@@ -768,6 +795,7 @@ async function fetchFromGoogleDrive(isManual = false) {
 
             members = data.members || [];
             orders = data.orders || {};
+            orderNotes = data.orderNotes || {};
             isMenuLocked = data.isLocked || false;
             MENU_DATA = data.menuData || [];
 
@@ -781,6 +809,7 @@ async function fetchFromGoogleDrive(isManual = false) {
             saveLocal();
             renderTable();
             calculateAll();
+            renderOrderNotes();
             updateUserModeUI();
             renderAdminPanelUI();
             updateStatus("online", `同步成功 (${new Date().toLocaleTimeString('zh-TW')})`);
@@ -793,6 +822,22 @@ async function fetchFromGoogleDrive(isManual = false) {
         updateStatus("offline", "雲端讀取失敗，使用本地暫存");
         if (isManual) alert("雲端讀取失敗：" + err.message);
     }
+}
+
+function renderOrderNotes() {
+    const panel = document.getElementById("order-notes-panel");
+    const list = document.getElementById("order-notes-list");
+    if (!panel || !list) return;
+    const entries = members.map(m => [m, String(orderNotes[m] || "").trim()]).filter(([, note]) => note);
+    if (entries.length === 0) { panel.style.display = "none"; list.innerHTML = ""; return; }
+    panel.style.display = "block";
+    list.innerHTML = "";
+    entries.forEach(([member, note]) => {
+        const row = document.createElement("div"); row.className = "order-note-item";
+        const nameSpan = document.createElement("span"); nameSpan.className = "order-note-name"; nameSpan.textContent = member;
+        const noteSpan = document.createElement("span"); noteSpan.textContent = note;
+        row.appendChild(nameSpan); row.appendChild(noteSpan); list.appendChild(row);
+    });
 }
 
 function renderTable() {
@@ -954,6 +999,7 @@ async function submitMyOrderToCloud() {
             isGuest: isGuestModeActive,
             targetMember: currentUser,
             memberOrders: orders[currentUser] || {},
+            orderNote: (document.getElementById("order-note-input")?.value || "").trim(),
             menuSummary: MENU_DATA.map(i => ({ id: i.id, category: i.category, name: i.name, price: i.price }))
         };
 
@@ -966,6 +1012,9 @@ async function submitMyOrderToCloud() {
 
         const resJson = await resp.json();
         if (resJson.status === "success") {
+            orderNotes[currentUser] = (document.getElementById("order-note-input")?.value || "").trim();
+            saveLocal();
+            renderOrderNotes();
             updateStatus("online", "訂單已成功儲存！");
             alert(`🎉 恭喜！${currentUser} 的點餐已送達！`);
             await fetchFromGoogleDrive(false);
