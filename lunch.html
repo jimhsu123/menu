@@ -439,6 +439,25 @@ function jwt_decode(token) {
 /**
  * 檢查當前 Token 是否依然有效 (預留 60 秒緩衝時間)
  */
+function formatApiError(result) {
+    return (result.code ? '[' + result.code + '] ' : '[API_ERROR] ') + (result.message || '操作失敗') +
+        (result.hint ? '\n處理方式：' + result.hint : '') +
+        (result.referenceId ? '\n查詢編號：' + result.referenceId : '');
+}
+
+function requireValidLogin() {
+    let message = '';
+    const decoded = currentIdToken ? jwt_decode(currentIdToken) : null;
+    if (!currentIdToken) message = '[AUTH_MISSING] 尚未取得 Google 登入憑證。';
+    else if (!decoded || !Number.isFinite(Number(decoded.exp)) || Number(decoded.exp) <= 0) message = '[AUTH_MALFORMED] 本機登入憑證格式或有效期限不正確。';
+    else if (Number(decoded.exp) <= Date.now() / 1000) message = '[AUTH_EXPIRED] 本機登入憑證已過期。';
+    else if (Number(decoded.exp) <= Date.now() / 1000 + 60) message = '[AUTH_EXPIRING] 登入憑證將於 1 分鐘內到期。';
+    if (!message) return true;
+    alert(message + '\n處理方式：請登出後重新 Google 登入，再重試操作。');
+    document.getElementById('btn-manual-login').style.display = 'inline-flex';
+    return false;
+}
+
 function isTokenValid(token) {
     if (!token) return false;
     const decoded = jwt_decode(token);
@@ -656,12 +675,16 @@ async function verifyUserRoleWithBackend(token) {
             redirect: "follow"
         });
         const res = await resp.json();
-        if (res.status === "success" && res.data.isAdmin) {
-            isCurrentUserAdmin = true;
-            renderAdminPanelUI();
-        }
+        if (token !== currentIdToken || isGuestModeActive) return;
+        if (res.status !== 'success') throw new Error(formatApiError(res));
+        isCurrentUserAdmin = Boolean(res.data.isAdmin);
+        renderAdminPanelUI();
     } catch (e) {
-        console.warn("核對角色略過，維持現有標記", e);
+        if (token !== currentIdToken || isGuestModeActive) return;
+        isCurrentUserAdmin = false;
+        renderAdminPanelUI();
+        updateStatus('offline', '登入驗證失敗');
+        alert('登入驗證失敗：\n' + e.message);
     }
 }
 
@@ -853,7 +876,7 @@ async function fetchFromGoogleDrive(isManual = false) {
             updateStatus("online", `同步成功 (${new Date().toLocaleTimeString('zh-TW')})`);
 
         } else {
-            throw new Error(resJson.message);
+            throw new Error(formatApiError(resJson));
         }
     } catch (err) {
         console.error(err);
@@ -1004,11 +1027,7 @@ async function submitMyOrderToCloud() {
 
     const orderNote = normalizeOrderNote(document.getElementById('order-note-input').value);
 
-    if (!isGuestModeActive && !isTokenValid(currentIdToken)) {
-        alert("登入憑證已過期，請點擊「重新登入」刷新憑證後再送出！");
-        triggerGoogleSignIn();
-        return;
-    }
+    if (!isGuestModeActive && !requireValidLogin()) return;
 
     isSubmitting = true;
     updateStatus("syncing", "正在寫入訂單...");
@@ -1044,7 +1063,7 @@ async function submitMyOrderToCloud() {
             alert(`🎉 恭喜！${currentUser} 的點餐已送達！`);
             await fetchFromGoogleDrive(false);
         } else {
-            throw new Error(resJson.message);
+            throw new Error(formatApiError(resJson));
         }
     } catch (err) {
         console.error(err);
@@ -1057,18 +1076,9 @@ async function submitMyOrderToCloud() {
 }
 
 async function adminAction(action, confirmMsg) {
-    if (!currentIdToken) {
-        alert("此操作需要管理員權限，請先透過 Google 帳號登入！");
-        triggerGoogleSignIn();
-        return;
-    }
+    if (!requireValidLogin()) return;
 
-    // 檢查 Token 是否仍在有效期限內
-    if (!isTokenValid(currentIdToken)) {
-        alert("⚠️ 您的 Google 登入憑證已超過 1 小時有效期限，請先重新點擊登入以獲取新憑證！");
-        triggerGoogleSignIn();
-        return;
-    }
+
 
     if (isSubmitting) return;
     if (confirmMsg && !confirm(confirmMsg)) return;
@@ -1098,7 +1108,7 @@ async function adminAction(action, confirmMsg) {
             alert("✅ 操作成功！");
             await fetchFromGoogleDrive(false);
         } else {
-            throw new Error(resJson.message);
+            throw new Error(formatApiError(resJson));
         }
     } catch (err) {
         console.error(err);
@@ -1118,7 +1128,7 @@ function saveNoteDraft() {
 
 async function loadLastOrder() {
     if (!currentUser || isGuestModeActive || isMenuLocked || isSubmitting || isLoadingLastOrder || !MENU_DATA.length) return;
-    if (!isTokenValid(currentIdToken)) { alert('請重新 Google 登入後再帶入上次訂單。'); triggerGoogleSignIn(); return; }
+    if (!requireValidLogin()) return;
     const store = currentStoreId, user = currentUser, token = currentIdToken;
     isLoadingLastOrder = true;
     updateUserModeUI();
@@ -1129,7 +1139,7 @@ async function loadLastOrder() {
         });
         const result = await response.json();
         if (store !== currentStoreId || user !== currentUser || token !== currentIdToken || isGuestModeActive || isMenuLocked) return;
-        if (result.status !== 'success') throw new Error(result.message || '讀取失敗');
+        if (result.status !== 'success') throw new Error(formatApiError(result));
         if (!result.data || !Array.isArray(result.data.items) || !result.data.items.length) {
             alert('此 Google 帳號尚無這份菜單的上次訂單。更新後成功送出餐點，即會保存紀錄。'); return;
         }
