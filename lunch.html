@@ -207,22 +207,14 @@ tfoot td.sticky-col-1, tfoot td.sticky-col-2, tfoot td.sticky-col-3 { background
 .modal-footer { padding: 12px 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px; }
 textarea.summary-text { width: 100%; height: 260px; background-color: #121418; border: 1px solid var(--border-color); color: #e5e7eb; padding: 10px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; }
 .order-item-chip { display: flex; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid #2e3440; }
-.order-note-field { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.order-note-field label { font-size: 0.85rem; font-weight: 600; }
-.order-note-field input { flex: 1; min-width: 160px; padding: 7px 9px; border: 1px solid var(--border-color); border-radius: 6px; background: #121418; color: #e5e7eb; }
+.order-note-field { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; border: 2px solid var(--accent-orange); border-radius: 10px; background: #332315; box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12); }
+.order-note-field label { font-size: 1rem; font-weight: 700; color: #fed7aa; }
+.order-note-field input { flex: 1; min-width: 160px; padding: 10px 12px; border: 1px solid #fb923c; border-radius: 6px; background: #121418; color: #f9fafb; font-size: 1rem; }
+.order-note-field input::placeholder { color: #b9bec8; opacity: 1; }
+.order-note-field input:focus-visible { outline: 2px solid #fed7aa; outline-offset: 2px; }
 .order-note-field input:disabled { opacity: 0.6; }
 .order-note-list { margin: 10px 0; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--card-bg); }
 .order-note-list div { margin-top: 5px; white-space: pre-wrap; overflow-wrap: anywhere; }
-/* 訂單備註獨立呈現，桌機與手機皆保持整列。 */
-.order-note-field { display: block; margin: 0 0 16px; padding: 18px; border: 2px solid #f59e0b; border-left-width: 6px; border-radius: 12px; background: #302415; }
-.order-note-field label { display: block; color: #fde68a; font-size: 1.12rem; font-weight: 800; }
-.order-note-field label span { font-size: .78rem; font-weight: 500; margin-left: 8px; }
-.order-note-field p { color: #f5d9ac; font-size: .9rem; margin: 6px 0 12px; }
-.order-note-field input { width: 100%; min-width: 0; min-height: 48px; padding: 12px; font-size: 1rem; border: 1px solid #d6a45d; background: #171a21; color: #fff; }
-.order-note-field input::placeholder { color: #bfc3cc; }
-.order-note-field input:focus { outline: 3px solid #fbbf24; outline-offset: 3px; }
-.order-note-list { border: 1px solid #d6a45d; border-left: 5px solid #f59e0b; background: #302415; padding: 16px; }
-.order-note-list strong { color: #fde68a; font-size: 1rem; }
 </style>
 </head>
 <body>
@@ -253,7 +245,7 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
             </div>
 
             <button class="btn-submit-main" id="btn-submit-order" onclick="submitMyOrderToCloud()" disabled>送出我的點餐</button>
-            <button class="btn-primary" id="btn-last-order" onclick="loadLastOrder()" style="display:none;" disabled>↶ 上次訂單</button>
+            <div class="order-note-field"><label for="order-note-input">📝 訂單備註</label><input id="order-note-input" type="text" maxlength="200" placeholder="例如：不要香菜（最多 200 字）" disabled></div>
             <button class="btn-secondary" onclick="fetchFromGoogleDrive(true)">重新整理</button>
         </div>
         <div class="sync-status-indicator">
@@ -261,12 +253,6 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
             <span id="sync-status-text">菜單就緒</span>
         </div>
     </div>
-
-    <section class="order-note-field" aria-labelledby="order-note-label">
-        <label id="order-note-label" for="order-note-input">📝 訂單備註 <span>選填</span></label>
-        <p id="order-note-help">少飯、不要香菜、醬料分開？請在這裡填寫，備註會隨點餐一起送出。</p>
-        <input id="order-note-input" type="text" maxlength="200" aria-describedby="order-note-help" placeholder="例如：不要香菜、少飯（最多 200 字）" oninput="saveNoteDraft()" disabled>
-    </section>
 
     <!-- Admin Panel (管理員面板) -->
     <div class="admin-panel" id="admin-controls-panel">
@@ -381,7 +367,6 @@ let currentStoreId = "";
 let isSubmitting = false;
 let isMenuLocked = false;
 let isGsiInitialized = false;
-let isLoadingLastOrder = false;
 
 function formatPrice(val) {
     if (typeof val !== 'number') val = Number(val);
@@ -439,25 +424,6 @@ function jwt_decode(token) {
 /**
  * 檢查當前 Token 是否依然有效 (預留 60 秒緩衝時間)
  */
-function formatApiError(result) {
-    return (result.code ? '[' + result.code + '] ' : '[API_ERROR] ') + (result.message || '操作失敗') +
-        (result.hint ? '\n處理方式：' + result.hint : '') +
-        (result.referenceId ? '\n查詢編號：' + result.referenceId : '');
-}
-
-function requireValidLogin() {
-    let message = '';
-    const decoded = currentIdToken ? jwt_decode(currentIdToken) : null;
-    if (!currentIdToken) message = '[AUTH_MISSING] 尚未取得 Google 登入憑證。';
-    else if (!decoded || !Number.isFinite(Number(decoded.exp)) || Number(decoded.exp) <= 0) message = '[AUTH_MALFORMED] 本機登入憑證格式或有效期限不正確。';
-    else if (Number(decoded.exp) <= Date.now() / 1000) message = '[AUTH_EXPIRED] 本機登入憑證已過期。';
-    else if (Number(decoded.exp) <= Date.now() / 1000 + 60) message = '[AUTH_EXPIRING] 登入憑證將於 1 分鐘內到期。';
-    if (!message) return true;
-    alert(message + '\n處理方式：請登出後重新 Google 登入，再重試操作。');
-    document.getElementById('btn-manual-login').style.display = 'inline-flex';
-    return false;
-}
-
 function isTokenValid(token) {
     if (!token) return false;
     const decoded = jwt_decode(token);
@@ -675,16 +641,12 @@ async function verifyUserRoleWithBackend(token) {
             redirect: "follow"
         });
         const res = await resp.json();
-        if (token !== currentIdToken || isGuestModeActive) return;
-        if (res.status !== 'success') throw new Error(formatApiError(res));
-        isCurrentUserAdmin = Boolean(res.data.isAdmin);
-        renderAdminPanelUI();
+        if (res.status === "success" && res.data.isAdmin) {
+            isCurrentUserAdmin = true;
+            renderAdminPanelUI();
+        }
     } catch (e) {
-        if (token !== currentIdToken || isGuestModeActive) return;
-        isCurrentUserAdmin = false;
-        renderAdminPanelUI();
-        updateStatus('offline', '登入驗證失敗');
-        alert('登入驗證失敗：\n' + e.message);
+        console.warn("核對角色略過，維持現有標記", e);
     }
 }
 
@@ -817,10 +779,6 @@ function updateStatus(type, msg) {
 }
 
 function updateUserModeUI() {
-    const lastButton = document.getElementById('btn-last-order');
-    lastButton.style.display = currentUser && currentIdToken && !isGuestModeActive ? 'inline-flex' : 'none';
-    lastButton.disabled = isMenuLocked || isLoadingLastOrder || isSubmitting || !MENU_DATA.length;
-    lastButton.textContent = isLoadingLastOrder ? '讀取中…' : '↶ 上次訂單';
     const btnSubmit = document.getElementById('btn-submit-order');
     const btnClearMyOrder = document.getElementById('btn-clear-my-order');
 
@@ -876,7 +834,7 @@ async function fetchFromGoogleDrive(isManual = false) {
             updateStatus("online", `同步成功 (${new Date().toLocaleTimeString('zh-TW')})`);
 
         } else {
-            throw new Error(formatApiError(resJson));
+            throw new Error(resJson.message);
         }
     } catch (err) {
         console.error(err);
@@ -1027,7 +985,11 @@ async function submitMyOrderToCloud() {
 
     const orderNote = normalizeOrderNote(document.getElementById('order-note-input').value);
 
-    if (!isGuestModeActive && !requireValidLogin()) return;
+    if (!isGuestModeActive && !isTokenValid(currentIdToken)) {
+        alert("登入憑證已過期，請點擊「重新登入」刷新憑證後再送出！");
+        triggerGoogleSignIn();
+        return;
+    }
 
     isSubmitting = true;
     updateStatus("syncing", "正在寫入訂單...");
@@ -1063,7 +1025,7 @@ async function submitMyOrderToCloud() {
             alert(`🎉 恭喜！${currentUser} 的點餐已送達！`);
             await fetchFromGoogleDrive(false);
         } else {
-            throw new Error(formatApiError(resJson));
+            throw new Error(resJson.message);
         }
     } catch (err) {
         console.error(err);
@@ -1076,9 +1038,18 @@ async function submitMyOrderToCloud() {
 }
 
 async function adminAction(action, confirmMsg) {
-    if (!requireValidLogin()) return;
+    if (!currentIdToken) {
+        alert("此操作需要管理員權限，請先透過 Google 帳號登入！");
+        triggerGoogleSignIn();
+        return;
+    }
 
-
+    // 檢查 Token 是否仍在有效期限內
+    if (!isTokenValid(currentIdToken)) {
+        alert("⚠️ 您的 Google 登入憑證已超過 1 小時有效期限，請先重新點擊登入以獲取新憑證！");
+        triggerGoogleSignIn();
+        return;
+    }
 
     if (isSubmitting) return;
     if (confirmMsg && !confirm(confirmMsg)) return;
@@ -1108,7 +1079,7 @@ async function adminAction(action, confirmMsg) {
             alert("✅ 操作成功！");
             await fetchFromGoogleDrive(false);
         } else {
-            throw new Error(formatApiError(resJson));
+            throw new Error(resJson.message);
         }
     } catch (err) {
         console.error(err);
@@ -1117,48 +1088,6 @@ async function adminAction(action, confirmMsg) {
     } finally {
         isSubmitting = false;
     }
-}
-
-function saveNoteDraft() {
-    if (!currentUser || isMenuLocked) return;
-    orderNotes[currentUser] = document.getElementById('order-note-input').value.slice(0, 200);
-    saveLocal();
-    renderOrderNotes();
-}
-
-async function loadLastOrder() {
-    if (!currentUser || isGuestModeActive || isMenuLocked || isSubmitting || isLoadingLastOrder || !MENU_DATA.length) return;
-    if (!requireValidLogin()) return;
-    const store = currentStoreId, user = currentUser, token = currentIdToken;
-    isLoadingLastOrder = true;
-    updateUserModeUI();
-    try {
-        const response = await fetch(GOOGLE_GAS_API_URL, {
-            method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, redirect: 'follow',
-            body: JSON.stringify({ action: 'get_last_order', storeId: store, idToken: token })
-        });
-        const result = await response.json();
-        if (store !== currentStoreId || user !== currentUser || token !== currentIdToken || isGuestModeActive || isMenuLocked) return;
-        if (result.status !== 'success') throw new Error(formatApiError(result));
-        if (!result.data || !Array.isArray(result.data.items) || !result.data.items.length) {
-            alert('此 Google 帳號尚無這份菜單的上次訂單。更新後成功送出餐點，即會保存紀錄。'); return;
-        }
-        const restored = {};
-        let skipped = 0;
-        result.data.items.forEach(previous => {
-            const item = MENU_DATA.find(item => String(item.id) === String(previous.id) && String(item.name) === previous.name && String(item.category || '') === previous.category);
-            if (item && Number(previous.qty) > 0) restored[item.id] = Math.min(99, Math.floor(Number(previous.qty)));
-            else skipped++;
-        });
-        if (!Object.keys(restored).length) { alert('上次訂購的餐點已不在目前菜單中，請重新選餐。'); return; }
-        if (Object.values(orders[user] || {}).some(q => Number(q) > 0) && !confirm('要用上次訂單取代目前的餐點數量嗎？本次備註會保留。')) return;
-        orders[user] = restored;
-        if (!members.includes(user)) members.push(user);
-        saveLocal(); renderTable(); calculateAll();
-        updateStatus('online', '已帶入上次訂單，請確認後送出');
-        alert('已帶入上次訂單，金額依目前菜單計算。請確認後按「送出點餐」。' + (skipped ? '\n已略過 ' + skipped + ' 個已移除或變更的餐點。' : ''));
-    } catch (err) { alert('無法讀取上次訂單：' + err.message); }
-    finally { isLoadingLastOrder = false; updateUserModeUI(); }
 }
 
 function clearMyOrder() {
