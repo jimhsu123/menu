@@ -213,6 +213,16 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
 .order-note-field input:disabled { opacity: 0.6; }
 .order-note-list { margin: 10px 0; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--card-bg); }
 .order-note-list div { margin-top: 5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* 訂單備註獨立呈現，桌機與手機皆保持整列。 */
+.order-note-field { display: block; margin: 0 0 16px; padding: 18px; border: 2px solid #f59e0b; border-left-width: 6px; border-radius: 12px; background: #302415; }
+.order-note-field label { display: block; color: #fde68a; font-size: 1.12rem; font-weight: 800; }
+.order-note-field label span { font-size: .78rem; font-weight: 500; margin-left: 8px; }
+.order-note-field p { color: #f5d9ac; font-size: .9rem; margin: 6px 0 12px; }
+.order-note-field input { width: 100%; min-width: 0; min-height: 48px; padding: 12px; font-size: 1rem; border: 1px solid #d6a45d; background: #171a21; color: #fff; }
+.order-note-field input::placeholder { color: #bfc3cc; }
+.order-note-field input:focus { outline: 3px solid #fbbf24; outline-offset: 3px; }
+.order-note-list { border: 1px solid #d6a45d; border-left: 5px solid #f59e0b; background: #302415; padding: 16px; }
+.order-note-list strong { color: #fde68a; font-size: 1rem; }
 </style>
 </head>
 <body>
@@ -243,7 +253,7 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
             </div>
 
             <button class="btn-submit-main" id="btn-submit-order" onclick="submitMyOrderToCloud()" disabled>送出我的點餐</button>
-            <div class="order-note-field"><label for="order-note-input">📝 訂單備註</label><input id="order-note-input" type="text" maxlength="200" placeholder="例如：不要香菜（最多 200 字）" disabled></div>
+            <button class="btn-primary" id="btn-last-order" onclick="loadLastOrder()" style="display:none;" disabled>↶ 上次訂單</button>
             <button class="btn-secondary" onclick="fetchFromGoogleDrive(true)">重新整理</button>
         </div>
         <div class="sync-status-indicator">
@@ -251,6 +261,12 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
             <span id="sync-status-text">菜單就緒</span>
         </div>
     </div>
+
+    <section class="order-note-field" aria-labelledby="order-note-label">
+        <label id="order-note-label" for="order-note-input">📝 訂單備註 <span>選填</span></label>
+        <p id="order-note-help">少飯、不要香菜、醬料分開？請在這裡填寫，備註會隨點餐一起送出。</p>
+        <input id="order-note-input" type="text" maxlength="200" aria-describedby="order-note-help" placeholder="例如：不要香菜、少飯（最多 200 字）" oninput="saveNoteDraft()" disabled>
+    </section>
 
     <!-- Admin Panel (管理員面板) -->
     <div class="admin-panel" id="admin-controls-panel">
@@ -365,6 +381,7 @@ let currentStoreId = "";
 let isSubmitting = false;
 let isMenuLocked = false;
 let isGsiInitialized = false;
+let isLoadingLastOrder = false;
 
 function formatPrice(val) {
     if (typeof val !== 'number') val = Number(val);
@@ -777,6 +794,10 @@ function updateStatus(type, msg) {
 }
 
 function updateUserModeUI() {
+    const lastButton = document.getElementById('btn-last-order');
+    lastButton.style.display = currentUser && currentIdToken && !isGuestModeActive ? 'inline-flex' : 'none';
+    lastButton.disabled = isMenuLocked || isLoadingLastOrder || isSubmitting || !MENU_DATA.length;
+    lastButton.textContent = isLoadingLastOrder ? '讀取中…' : '↶ 上次訂單';
     const btnSubmit = document.getElementById('btn-submit-order');
     const btnClearMyOrder = document.getElementById('btn-clear-my-order');
 
@@ -1086,6 +1107,48 @@ async function adminAction(action, confirmMsg) {
     } finally {
         isSubmitting = false;
     }
+}
+
+function saveNoteDraft() {
+    if (!currentUser || isMenuLocked) return;
+    orderNotes[currentUser] = document.getElementById('order-note-input').value.slice(0, 200);
+    saveLocal();
+    renderOrderNotes();
+}
+
+async function loadLastOrder() {
+    if (!currentUser || isGuestModeActive || isMenuLocked || isSubmitting || isLoadingLastOrder || !MENU_DATA.length) return;
+    if (!isTokenValid(currentIdToken)) { alert('請重新 Google 登入後再帶入上次訂單。'); triggerGoogleSignIn(); return; }
+    const store = currentStoreId, user = currentUser, token = currentIdToken;
+    isLoadingLastOrder = true;
+    updateUserModeUI();
+    try {
+        const response = await fetch(GOOGLE_GAS_API_URL, {
+            method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, redirect: 'follow',
+            body: JSON.stringify({ action: 'get_last_order', storeId: store, idToken: token })
+        });
+        const result = await response.json();
+        if (store !== currentStoreId || user !== currentUser || token !== currentIdToken || isGuestModeActive || isMenuLocked) return;
+        if (result.status !== 'success') throw new Error(result.message || '讀取失敗');
+        if (!result.data || !Array.isArray(result.data.items) || !result.data.items.length) {
+            alert('此 Google 帳號尚無這份菜單的上次訂單。更新後成功送出餐點，即會保存紀錄。'); return;
+        }
+        const restored = {};
+        let skipped = 0;
+        result.data.items.forEach(previous => {
+            const item = MENU_DATA.find(item => String(item.id) === String(previous.id) && String(item.name) === previous.name && String(item.category || '') === previous.category);
+            if (item && Number(previous.qty) > 0) restored[item.id] = Math.min(99, Math.floor(Number(previous.qty)));
+            else skipped++;
+        });
+        if (!Object.keys(restored).length) { alert('上次訂購的餐點已不在目前菜單中，請重新選餐。'); return; }
+        if (Object.values(orders[user] || {}).some(q => Number(q) > 0) && !confirm('要用上次訂單取代目前的餐點數量嗎？本次備註會保留。')) return;
+        orders[user] = restored;
+        if (!members.includes(user)) members.push(user);
+        saveLocal(); renderTable(); calculateAll();
+        updateStatus('online', '已帶入上次訂單，請確認後送出');
+        alert('已帶入上次訂單，金額依目前菜單計算。請確認後按「送出點餐」。' + (skipped ? '\n已略過 ' + skipped + ' 個已移除或變更的餐點。' : ''));
+    } catch (err) { alert('無法讀取上次訂單：' + err.message); }
+    finally { isLoadingLastOrder = false; updateUserModeUI(); }
 }
 
 function clearMyOrder() {
