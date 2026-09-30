@@ -882,7 +882,7 @@ function renderTable() {
     }
     renderOptionPickers(tbody);
     MENU_DATA.forEach(item => {
-        if (item.baseId && !members.some(m => Number((orders[m] || {})[item.id]) > 0)) return;
+        if (item.baseId) return;
         const tr = document.createElement("tr");
 
         tr.innerHTML = `
@@ -989,6 +989,7 @@ function calculateAll() {
     document.getElementById("grand-total-amount").innerText = `NT$ ${formatAmount(grandTotalAmount)}`;
     document.getElementById("grand-total-qty").innerText = `${grandTotalQty} 份`;
     document.getElementById("total-members-count").innerText = `${members.length} 人`;
+    optionRowRefreshers.forEach(refresh => refresh());
 }
 
 async function submitMyOrderToCloud() {
@@ -1200,7 +1201,11 @@ function getOptionColumnNames() {
     return [...new Set(MENU_DATA.flatMap(item => (item.options || []).map(group => group.name)))];
 }
 
+const optionSelectionCache = new Map();
+let optionRowRefreshers = [];
+
 function renderOptionPickers(tbody) {
+    optionRowRefreshers = [];
     const seen = new Set();
     const optionNames = getOptionColumnNames();
     MENU_DATA.forEach(item => {
@@ -1209,6 +1214,10 @@ function renderOptionPickers(tbody) {
         const row = document.createElement('tr');
         row.innerHTML = '<td class="sticky-col-1 col-category"><span class="badge-category">' + escapeMenuText(item.category) + '</span></td><td class="sticky-col-2">' + escapeMenuText(item.baseName) + '</td>';
         const selects = new Map();
+        const selectionKey = JSON.stringify([currentStoreId, item.baseId]);
+        const savedChoices = optionSelectionCache.get(selectionKey) || {};
+        const memberCells = [];
+        const summaryCells = [];
         optionNames.forEach(name => {
             const td = document.createElement('td');
             const group = item.options.find(g => g.name === name);
@@ -1222,6 +1231,7 @@ function renderOptionPickers(tbody) {
                     option.value = value; option.textContent = value;
                     select.appendChild(option);
                 });
+                if (group.values.includes(savedChoices[name])) select.value = savedChoices[name];
                 selects.set(name, select); td.appendChild(select);
             } else td.textContent = '—';
             row.appendChild(td);
@@ -1229,25 +1239,59 @@ function renderOptionPickers(tbody) {
         const price = document.createElement('td');
         price.className = 'sticky-col-3'; price.textContent = '$' + formatPrice(item.price);
         row.appendChild(price);
+        const selectedVariant = () => MENU_DATA.find(v => v.baseId === item.baseId && v.choices.every(c => c[1] === selects.get(c[0]).value));
         members.forEach(member => {
             const td = document.createElement('td');
             td.className = member === currentUser ? 'current-user-col' : 'readonly-col';
+            let value;
             if (member === currentUser) {
-                const add = document.createElement('button');
-                add.className = 'btn-secondary'; add.textContent = '加入 1 份';
-                add.disabled = isMenuLocked;
-                add.onclick = () => {
-                    const variant = MENU_DATA.find(v => v.baseId === item.baseId && v.choices.every(c => c[1] === selects.get(c[0]).value));
-                    if (variant) { updateQty(variant.id, 1); renderTable(); calculateAll(); }
-                };
-                td.appendChild(add);
-            } else td.textContent = '—';
-            row.appendChild(td);
+                const control = document.createElement('div');
+                control.className = 'qty-control';
+                if (isMenuLocked) control.setAttribute('disabled', '');
+                value = document.createElement('input');
+                value.className = 'qty-input'; value.type = 'text'; value.readOnly = true;
+                value.setAttribute('aria-label', item.baseName + ' 數量');
+                [-1, 1].forEach(delta => {
+                    const button = document.createElement('button');
+                    button.className = 'qty-btn'; button.textContent = delta < 0 ? '-' : '+';
+                    button.disabled = isMenuLocked;
+                    button.onclick = () => {
+                        const variant = selectedVariant();
+                        if (variant) updateQty(variant.id, delta);
+                    };
+                    control.appendChild(button);
+                    if (delta < 0) control.appendChild(value);
+                });
+                td.appendChild(control);
+            } else {
+                value = document.createElement('span'); td.appendChild(value);
+            }
+            memberCells.push({member, value}); row.appendChild(td);
         });
         ['col-summary-qty', 'col-summary-amount'].forEach(className => {
             const td = document.createElement('td');
-            td.className = className; td.textContent = '—'; row.appendChild(td);
+            td.className = className; summaryCells.push(td); row.appendChild(td);
         });
+        const refresh = () => {
+            const variant = selectedVariant();
+            let total = 0;
+            memberCells.forEach(({member, value}) => {
+                const qty = variant ? Number((orders[member] || {})[variant.id] || 0) : 0;
+                total += qty;
+                if (member === currentUser) value.value = qty;
+                else { value.textContent = qty; value.className = 'readonly-val ' + (qty > 0 ? 'has-qty' : 'zero'); }
+            });
+            summaryCells[0].textContent = total;
+            summaryCells[1].textContent = 'NT$ ' + formatAmount(total * (variant ? variant.price : 0));
+        };
+        selects.forEach(select => {
+            select.onchange = () => {
+                optionSelectionCache.set(selectionKey, Object.fromEntries([...selects].map(([name, input]) => [name, input.value])));
+                refresh();
+            };
+        });
+        optionRowRefreshers.push(refresh);
+        refresh();
         tbody.appendChild(row);
     });
 }
