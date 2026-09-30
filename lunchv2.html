@@ -13,7 +13,7 @@
   connect-src 'self' https://script.google.com https://script.googleusercontent.com https://oauth2.googleapis.com;
   frame-src https://accounts.google.com;
 ">
-<title>多店家多人點餐 - lunchv2(內部用) </title>
+<title>御膳雅集｜多人點餐</title>
 <!-- 引入 Google Identity Services (GIS) SDK -->
 <script src="https://accounts.google.com/gsi/client" async defer onload="initGoogleSignIn()"></script>
 <style>
@@ -231,6 +231,123 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
 #matrix-table thead th.col-summary-amount { position: sticky; top: 0; z-index: 12; }
 #matrix-table thead th.col-summary-qty { background-color: #382a20; }
 #matrix-table thead th.col-summary-amount { background-color: #37301f; }
+
+/* 宮廷華麗主題：保留原有點餐行為 */
+:root {
+ --bg-dark:#f5efe3; --card-bg:#fffaf0; --border-color:#d9c59e;
+ --accent-orange:#986b28; --accent-red:#8c2938; --accent-yellow:#986c27;
+ --accent-green:#466a50; --accent-blue:#986c27; --text-main:#382723;
+ --text-muted:#806e5c; --row-even:#f8f0e0; --row-hover:#efe1c5;
+}
+body {
+ padding:30px 24px 48px;
+ font-family:"Microsoft JhengHei","PingFang TC",sans-serif;
+ background:radial-gradient(ellipse at 50% 0, #fffaf0 0, transparent 65%),repeating-linear-gradient(45deg,transparent 0 23px,rgba(146,108,51,.035) 23px 24px),#f3ebdb;
+ color:var(--text-main);
+}
+.container {max-width:1400px;}
+.palace-hero {
+ position:relative; overflow:hidden; text-align:center; padding:30px 24px 34px;
+ margin-bottom:24px; color:#f4e5bc; border:1px solid #b58b48;
+ background:radial-gradient(ellipse at 50% -40%,#a45355 0,transparent 70%),linear-gradient(115deg,#4b1524,#762638 52%,#471421);
+ box-shadow:0 12px 35px #44201720,inset 0 0 0 6px #571c2d,inset 0 0 0 7px #b18a4b;
+}
+.palace-hero:before,.palace-hero:after {content:"";position:absolute;top:24px;bottom:24px;width:76px;border:1px solid #cda55c55;transform:rotate(45deg);pointer-events:none;}
+.palace-hero:before{left:-40px;} .palace-hero:after{right:-40px;}
+.palace-crest {width:66px;height:48px;display:block;margin:0 auto 13px;color:#e4c681;}
+.palace-kicker {font-size:10px;letter-spacing:.38em;color:#d6b879;}
+.palace-hero h1 {font-family:"PMingLiU","Noto Serif TC","Songti TC",serif;font-size:clamp(30px,4vw,46px);font-weight:600;letter-spacing:.22em;margin:9px 0 8px;padding-left:.22em;line-height:1.4;}
+.palace-description {font-size:13px;letter-spacing:.16em;color:#ead8ba;}
+.palace-divider {display:flex;align-items:center;justify-content:center;gap:14px;margin:17px auto 0;color:#d6b879;font-size:15px;}
+.palace-divider:before,.palace-divider:after{content:"";height:1px;width:100px;background:linear-gradient(90deg,transparent,#d6b879);}
+.palace-divider:after{transform:rotate(180deg);}
+.banner-notice {background:#fbf3e1;border:1px solid #d6bb85;border-left:3px solid #a37936;color:#725b38;border-radius:3px;padding:12px 16px;font-size:13px;gap:12px;}
+.locked-banner {background:#f6e8e8;border-color:#bd7d85;color:#842b39;}
+.submit-panel {background:#fffbf3;border:1px solid #ceb88d;border-top:3px solid #a78040;border-radius:5px;padding:20px 22px;margin-bottom:24px;box-shadow:0 5px 20px #5e3c1810;gap:16px;}
+.submit-left {gap:12px;}
+.submit-badge {background:transparent;color:#73512a;padding:0;font-size:12px;letter-spacing:.08em;}
+.select-store {background:#fffaf0;border:1px solid #c7af80;color:#49352a;border-radius:3px;padding:9px 12px;font-size:14px;min-height:38px;}
+.select-store:disabled{opacity:.65;cursor:not-allowed;}
+#user-avatar{border:1px solid #ac843f;}
+button {border-radius:3px;padding:9px 14px;min-height:38px;font-size:13px;letter-spacing:.025em;transition:background .2s,box-shadow .2s,transform .2s;}
+button:hover{box-shadow:0 3px 10px #704a2420;}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible {outline:2px solid #986b28;outline-offset:3px;}
+.btn-primary,.btn-submit-main {background:linear-gradient(135deg,#8e3546,#641d2e);color:#fff5dd;border:1px solid #8d4750;box-shadow:0 3px 8px #71243620;}
+.btn-primary:hover,.btn-submit-main:hover {background:linear-gradient(135deg,#a44355,#762638);}
+.btn-submit-main{font-size:14px;padding:10px 18px;border-radius:3px;}
+.btn-secondary {background:#f6ecda;border:1px solid #d4bc8e;color:#6b512e;}
+.btn-secondary:hover {background:#ecddbd;}
+.btn-success {background:#48664d;border:1px solid #48664d;color:#fff8e9;}
+.btn-success:hover {background:#36543d;}
+.btn-danger{background:#8b2e3d;color:#fff6e5;} .btn-danger:hover{background:#722333;}
+.btn-danger-outline {border-color:#bd7e85;color:#8c3342;background:#fff8f2;}
+.btn-danger-outline:hover {background:#8c3342;color:#fff8e9;}
+button:disabled,.btn-submit-main:disabled{background:#e5dbc8!important;color:#887b68;opacity:1;border:1px solid #d8cbb2;box-shadow:none;}
+.sync-status-indicator {font-size:12px;color:#7c6b54;} .status-dot{width:7px;height:7px;}
+header {padding:5px 0 21px;margin-bottom:18px;border-bottom:1px solid #cbb485;gap:20px;}
+.brand-title {gap:15px;}
+.brand-badge {background:#6c2333;color:#f2dba7;border:1px solid #b58e4e;border-radius:3px;font-family:"PMingLiU",serif;box-shadow:inset 0 0 0 3px #6c2333,inset 0 0 0 4px #b58e4e;padding:12px 16px;font-size:18px;}
+.brand-title h2 {font-family:"PMingLiU","Noto Serif TC",serif;font-size:25px;font-weight:600;letter-spacing:.05em;color:#612535;}
+.brand-subtitle {font-size:12px;margin-top:6px;color:#8b765a;letter-spacing:.06em;}
+.stats-bar{gap:12px;}
+.stat-card {background:#fffbf2;border:1px solid #d5c19b;border-radius:3px;padding:12px 20px;min-width:118px;position:relative;}
+.stat-card:before {content:"";position:absolute;top:0;left:15px;right:15px;height:2px;background:#b69250;}
+.stat-label {font-size:11px;letter-spacing:.07em;margin-bottom:4px;}
+.stat-value {font-family:Georgia,"Microsoft JhengHei",serif;font-size:23px;color:#7b2939;font-variant-numeric:tabular-nums;}
+.toolbar {background:transparent;border:0;border-radius:0;padding:0;margin-bottom:16px;gap:12px;}
+.action-controls {gap:10px;}
+#btn-last-order {color:#8d672d;border-color:#bd9b5c;background:#fff9ed;}
+#btn-last-order:hover{background:#efdfbc;}
+.order-note-field {gap:8px;}
+.order-note-field label {color:#785932;font-size:13px;}
+.order-note-field input {background:#fffdf8;border-color:#d3bd93;color:#382723;min-width:240px;font-size:13px;padding:10px 12px;border-radius:3px;}
+.order-note-field input::placeholder {color:#93846c;}
+.order-note-field input:focus-visible{outline-color:#ac843f;}
+.table-container {border:1px solid #c9ae78;border-top:3px solid #9e7739;border-radius:4px;background:#fffbf3;box-shadow:0 6px 24px #583a1e12;max-height:65vh;}
+#matrix-table {font-size:14px;}
+th,td {padding:13px 16px;border-bottom-color:#e2d5bc;}
+#matrix-table thead th {background:#662434;color:#f7e7bc;font-size:12px;font-weight:600;letter-spacing:.035em;border-bottom:1px solid #b99456;box-shadow:none;}
+#matrix-table .sticky-col-1,#matrix-table .sticky-col-2,#matrix-table .sticky-col-3,#matrix-table .frozen-left {background-color:#fffbf3;}
+#matrix-table thead th.frozen-left,#matrix-table thead th.sticky-col-3 {background-color:#662434;}
+#matrix-table thead th.col-summary-qty {background:#773243;color:#fae6b8;}
+#matrix-table thead th.col-summary-amount {background:#583322;color:#f4d694;}
+#matrix-table tfoot tr,#matrix-table tfoot td,#matrix-table tfoot td.frozen-left {background:#eadbbc;color:#634621;border-top:2px solid #b79760;}
+.badge-category {background:#f0e4cc;border:1px solid #d8c19a;color:#7b5a2e;padding:3px 8px;border-radius:2px;font-size:11px;}
+.col-summary-qty {background:#a1762710;color:#8a6228;}
+.col-summary-amount {background:#8b29380a;color:#7b2939;}
+#matrix-table .current-user-col{background:#e8d7b044!important;border-left-color:#b08a46;border-right-color:#b08a46;}
+#matrix-table thead th.current-user-col{background:#8c6a32!important;color:#fff5da;}
+.readonly-val {color:#725d43;} .readonly-val.has-qty{color:#873246;} .readonly-val.zero{color:#ada08b;}
+.qty-control {background:#fffaf0;border-color:#ba9556;border-radius:3px;}
+.qty-btn {color:#7f5928;padding:3px 9px;min-height:30px;}
+.qty-btn:hover {background:#a67e3c;color:#fff8e8;}
+.qty-input {color:#573523;}
+.qty-control[disabled]{border-color:#cfbea0;}
+.qty-control[disabled] .qty-btn,.qty-control[disabled] .qty-input{color:#9b8b73;}
+.admin-panel {background:#f5ead1;border-color:#b69250;border-radius:3px;}
+.modal-overlay {background:#29151bcc;backdrop-filter:blur(4px);}
+.modal-content {background:#fffaf0;border:1px solid #b39050;border-top:4px solid #782a3b;border-radius:5px;box-shadow:0 20px 70px #16071066;}
+.modal-header {color:#732a39;padding:18px 22px;font-family:"PMingLiU",serif;}
+.modal-body {padding:22px;}
+.modal-footer {padding:16px 22px;background:#f5ebd8;}
+textarea.summary-text {background:#fffdf8;color:#493426;border-color:#d1b989;border-radius:3px;line-height:1.8;}
+.order-item-chip{border-bottom-color:#dfcfb1;padding:12px 0;}
+.order-note-list {background:#fffbf2;border-radius:3px;border-color:#d5bd91;}
+.palace-footer {text-align:center;color:#9b815c;font-size:11px;letter-spacing:.16em;padding:22px 0 0;}
+@media(max-width:768px){
+ body{padding:14px 12px 30px;} .palace-hero{padding:24px 15px;margin-bottom:18px;}
+ .palace-description{font-size:11px;letter-spacing:.07em;} .palace-kicker{font-size:9px;letter-spacing:.23em;}
+ .submit-panel{padding:15px 12px;} .submit-left{width:100%;gap:10px;}
+ .order-note-field{width:100%;} .order-note-field input{min-width:0;width:100%;}
+ header{gap:17px;} .brand-title h2{font-size:19px;} .brand-badge{font-size:16px;padding:10px 12px;}
+ .stats-bar{width:100%;gap:8px;} .stat-card{flex:1;min-width:0;padding:10px 9px;}
+ .stat-value{font-size:19px;} .stat-label{font-size:10px;}
+ .banner-notice{align-items:flex-start;flex-wrap:wrap;padding:12px;font-size:12px;}
+ .toolbar{padding:0;} .action-controls{gap:8px;} .action-controls button{font-size:12px;padding:8px 10px;}
+ th,td{padding:11px 12px;} .table-container{max-height:60vh;}
+}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;}}
+
 </style>
 </head>
 <body>
@@ -283,7 +400,7 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
             <div class="brand-badge" id="store-brand-badge">點餐</div>
             <div>
                 <h2 id="store-title">多店家點餐與費用統計矩陣</h2>
-                <div class="brand-subtitle">lunchv2 - Google Sheets 同步版</div>
+                <div class="brand-subtitle">共席點餐 · 雲端同步</div>
             </div>
         </div>
         <div class="stats-bar">
@@ -329,6 +446,7 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
     </div>
 </div>
 
+<div class="palace-footer">❖ &nbsp; 御膳雅集 · 佳餚共賞 &nbsp; ❖</div>
 <!-- 店家劃單彈窗 -->
 <div class="modal-overlay" id="kitchen-modal">
     <div class="modal-content">
