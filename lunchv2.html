@@ -215,8 +215,17 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
 .order-note-field input:disabled { opacity: 0.6; }
 .order-note-list { margin: 10px 0; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--card-bg); }
 .order-note-list div { margin-top: 5px; white-space: pre-wrap; overflow-wrap: anywhere; }
-/* 選項欄位插入品名與單價之間，避免單價的固定位置遮住選項。 */
-.has-option-columns .sticky-col-3 { position: static; left: auto !important; }
+/* 水平凍結至單價左側；表頭仍各自垂直置頂。 */
+#btn-last-order { color: #fed7aa; border: 1px solid #fb923c; background-color: transparent; }
+#btn-last-order:hover { background-color: rgba(251, 146, 60, 0.12); }
+#matrix-table .sticky-col-3 { position: static; left: auto !important; }
+#matrix-table thead th.sticky-col-3 { position: sticky; top: 0; z-index: 10; }
+#matrix-table .frozen-left { position: sticky; left: var(--frozen-left) !important; z-index: 5; background-color: #1c1f26; }
+#matrix-table tbody tr:nth-child(even) .frozen-left { background-color: var(--row-even); }
+#matrix-table tbody tr:hover .frozen-left { background-color: var(--row-hover); }
+#matrix-table thead th.frozen-left { top: 0; z-index: 15; background-color: #232833; }
+#matrix-table tfoot td.frozen-left { z-index: 11; background-color: #171a21; }
+#matrix-table .frozen-edge { border-right: 2px solid var(--border-color); }
 </style>
 </head>
 <body>
@@ -936,6 +945,7 @@ function renderTable() {
     tdFootTotalAmt.className = "col-summary-amount";
     tdFootTotalAmt.innerText = "NT$ 0";
     tfootRow.appendChild(tdFootTotalAmt);
+    updateFrozenColumns();
 }
 
 function updateQty(itemId, delta) {
@@ -1035,7 +1045,7 @@ async function submitMyOrderToCloud() {
             saveLocal();
             renderOrderNotes();
             updateStatus("online", "訂單已成功儲存！");
-            alert(`🎉 恭喜！${currentUser} 的點餐已送出！`);
+            alert(`🎉 恭喜！${currentUser} 的點餐已送達！`);
             await fetchFromGoogleDrive(false);
         } else {
             throw new Error(resJson.message);
@@ -1325,6 +1335,38 @@ async function loadLastOrder() {
         alert('已帶入上次訂單，金額依目前菜單計算；確認後請按送出。' + (skipped.length ? `\n${skipped.length} 個已移除或變更的品項／選項未帶入。` : ''));
     } catch (err) { alert('讀取上次訂單失敗：' + err.message); }
     finally { isSubmitting = false; updateUserModeUI(); }
+}
+
+
+function updateFrozenColumns() {
+    const table = document.getElementById('matrix-table');
+    const header = document.getElementById('table-header-row');
+    if (!table || !header) return;
+    const headers = Array.from(header.children);
+    const boundary = headers.findIndex(cell => cell.classList.contains('sticky-col-3'));
+    let offset = 0;
+    const offsets = headers.slice(0, boundary).map(cell => {
+        const left = offset;
+        offset += cell.getBoundingClientRect().width;
+        return left;
+    });
+    Array.from(table.rows).forEach(row => {
+        Array.from(row.cells).forEach((cell, index) => {
+            const frozen = index < boundary && cell.colSpan === 1;
+            cell.classList.toggle('frozen-left', frozen);
+            cell.classList.toggle('frozen-edge', frozen && index === boundary - 1);
+            if (frozen) cell.style.setProperty('--frozen-left', offsets[index] + 'px');
+            else cell.style.removeProperty('--frozen-left');
+        });
+    });
+}
+
+// 欄寬、視窗及手機隱藏分類欄變動時，重新依實際寬度定位。
+window.addEventListener('resize', updateFrozenColumns);
+if (typeof ResizeObserver !== 'undefined') {
+    const frozenColumnObserver = new ResizeObserver(updateFrozenColumns);
+    frozenColumnObserver.observe(document.getElementById('matrix-table'));
+    frozenColumnObserver.observe(document.getElementById('table-header-row'));
 }
 
 </script>
