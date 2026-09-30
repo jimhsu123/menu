@@ -13,7 +13,7 @@
   connect-src 'self' https://script.google.com https://script.googleusercontent.com https://oauth2.googleapis.com;
   frame-src https://accounts.google.com;
 ">
-<title>多店家多人點餐 - lunch(內部用) </title>
+<title>多店家多人點餐 - lunchv2(內部用) </title>
 <!-- 引入 Google Identity Services (GIS) SDK -->
 <script src="https://accounts.google.com/gsi/client" async defer onload="initGoogleSignIn()"></script>
 <style>
@@ -267,7 +267,7 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
             <div class="brand-badge" id="store-brand-badge">點餐</div>
             <div>
                 <h2 id="store-title">多店家點餐與費用統計矩陣</h2>
-                <div class="brand-subtitle">lunch - Google Sheets 同步版</div>
+                <div class="brand-subtitle">lunchv2 - Google Sheets 同步版</div>
             </div>
         </div>
         <div class="stats-bar">
@@ -348,7 +348,7 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
 // ===================================================================
 // ======== 公開設定參數 =============================================
 // ===================================================================
-const GOOGLE_GAS_API_URL = "https://script.google.com/macros/s/AKfycby4PuRr7yRUNkvuMRNhiVucuN7tw7LfSZSG1YF3DvA3hZ3WmVXvsKrfEBTdY_-N5Lulrw/exec";
+const GOOGLE_GAS_API_URL = "https://script.google.com/macros/s/AKfycbw-5P_N1YRq2Pyst6qL6-ti6JxTQ9vcG0SzifX1wPFglk50EvoEQSi9XxSdpGrPo63D/exec";
 const GOOGLE_CLIENT_ID = "332175692979-nkrni08k8fleg7te2uju417rmc207vlv.apps.googleusercontent.com"; 
 
 // ===============================================
@@ -1196,14 +1196,33 @@ function renderOptionPickers(tbody) {
         if (!item.baseId || seen.has(item.baseId)) return;
         seen.add(item.baseId);
         const row = document.createElement('tr');
-        const cell = document.createElement('td');
-        cell.colSpan = members.length + 5;
-        const label = document.createElement('strong');
-        label.textContent = `${item.category} — ${item.baseName} ${item.price}　`;
-        cell.appendChild(label);
+        row.innerHTML = `
+            <td class="sticky-col-1 col-category"><span class="badge-category">${escapeMenuText(item.category)}</span></td>
+            <td class="sticky-col-2">${escapeMenuText(item.baseName)}</td>
+            <td class="sticky-col-3">$${formatPrice(item.price)}</td>`;
+        let cell;
+        members.forEach(member => {
+            const td = document.createElement('td');
+            td.className = member === currentUser ? 'current-user-col' : 'readonly-col';
+            if (member === currentUser) cell = td;
+            else td.textContent = '—';
+            row.appendChild(td);
+        });
+        ['col-summary-qty', 'col-summary-amount'].forEach(className => {
+            const td = document.createElement('td');
+            td.className = className;
+            td.textContent = '—';
+            row.appendChild(td);
+        });
+        tbody.appendChild(row);
+        if (!cell) return;
+        const controls = document.createElement('div');
+        controls.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;white-space:normal';
+        cell.appendChild(controls);
         const selects = item.options.map(group => {
             const label = document.createElement('label');
             label.textContent = group.name + '：';
+            label.style.cssText = 'display:flex;align-items:center;gap:4px;flex-wrap:wrap';
             const select = document.createElement('select');
             select.className = 'select-store';
             select.disabled = !currentUser || isMenuLocked;
@@ -1211,7 +1230,8 @@ function renderOptionPickers(tbody) {
                 const option = document.createElement('option');
                 option.value = value; option.textContent = value; select.appendChild(option);
             });
-            label.appendChild(select); cell.appendChild(label);
+            select.style.cssText = 'max-width:100%;min-width:0';
+            label.appendChild(select); controls.appendChild(label);
             return select;
         });
         const add = document.createElement('button');
@@ -1221,7 +1241,7 @@ function renderOptionPickers(tbody) {
             const variant = MENU_DATA.find(v => v.baseId === item.baseId && v.choices.every((c,i) => c[1] === selects[i].value));
             if (variant) { updateQty(variant.id, 1); renderTable(); calculateAll(); }
         };
-        cell.appendChild(add); row.appendChild(cell); tbody.appendChild(row);
+        controls.appendChild(add);
     });
 }
 
