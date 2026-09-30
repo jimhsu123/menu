@@ -1168,7 +1168,7 @@ async function submitMyOrderToCloud() {
             saveLocal();
             renderOrderNotes();
             updateStatus("online", "訂單已成功儲存！");
-            alert(`🎉 恭喜！${currentUser} 的點餐已送達！`);
+            alert(`🎉 恭喜！${currentUser} 的點餐已送出！`);
             await fetchFromGoogleDrive(false);
         } else {
             throw new Error(resJson.message);
