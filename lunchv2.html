@@ -215,6 +215,8 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
 .order-note-field input:disabled { opacity: 0.6; }
 .order-note-list { margin: 10px 0; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--card-bg); }
 .order-note-list div { margin-top: 5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* 選項欄位插入品名與單價之間，避免單價的固定位置遮住選項。 */
+.has-option-columns .sticky-col-3 { position: static; left: auto !important; }
 </style>
 </head>
 <body>
@@ -348,7 +350,7 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
 // ===================================================================
 // ======== 公開設定參數 =============================================
 // ===================================================================
-const GOOGLE_GAS_API_URL = "https://script.google.com/macros/s/AKfycbw-5P_N1YRq2Pyst6qL6-ti6JxTQ9vcG0SzifX1wPFglk50EvoEQSi9XxSdpGrPo63D/exec";
+const GOOGLE_GAS_API_URL = "https://script.google.com/macros/s/AKfycby4PuRr7yRUNkvuMRNhiVucuN7tw7LfSZSG1YF3DvA3hZ3WmVXvsKrfEBTdY_-N5Lulrw/exec";
 const GOOGLE_CLIENT_ID = "332175692979-nkrni08k8fleg7te2uju417rmc207vlv.apps.googleusercontent.com"; 
 
 // ===============================================
@@ -852,7 +854,10 @@ function renderTable() {
     const tfootRow = document.getElementById("table-foot-row");
     const tbody = document.getElementById("matrix-tbody");
 
-    while (theadRow.children.length > 3) theadRow.removeChild(theadRow.children[3]);
+    const optionNames = getOptionColumnNames();
+    const optionHeaders = optionNames.map(name => '<th>' + escapeMenuText(name) + '</th>').join('');
+    theadRow.innerHTML = '<th class="sticky-col-1 col-category">分類</th><th class="sticky-col-2">品項名稱</th>' + optionHeaders + '<th class="sticky-col-3">單價</th>';
+    tbody.closest('table').classList.toggle('has-option-columns', optionNames.length > 0);
 
     members.forEach(member => {
         const th = document.createElement("th");
@@ -873,7 +878,7 @@ function renderTable() {
 
     tbody.innerHTML = "";
     if (MENU_DATA.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 2rem; color: var(--text-muted);">正在載入菜單，或此店家無菜單資料...</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${members.length + optionNames.length + 5}" style="text-align:center; padding: 2rem; color: var(--text-muted);">正在載入菜單，或此店家無菜單資料...</td></tr>`;
     }
     renderOptionPickers(tbody);
     MENU_DATA.forEach(item => {
@@ -882,7 +887,8 @@ function renderTable() {
 
         tr.innerHTML = `
             <td class="sticky-col-1 col-category"><span class="badge-category">${escapeMenuText(item.category)}</span></td>
-            <td class="sticky-col-2">${escapeMenuText(item.name)}</td>
+            <td class="sticky-col-2">${escapeMenuText(item.baseName || item.name)}</td>
+            ${optionNames.map(name => { const choice = (item.choices || []).find(c => c[0] === name); return `<td>${choice ? escapeMenuText(choice[1]) : '—'}</td>`; }).join('')}
             <td class="sticky-col-3">$${item.price}</td>
         `;
 
@@ -911,7 +917,7 @@ function renderTable() {
         tbody.appendChild(tr);
     });
 
-    while (tfootRow.children.length > 3) tfootRow.removeChild(tfootRow.children[3]);
+    tfootRow.innerHTML = '<td class="sticky-col-1 col-category">統計</td><td class="sticky-col-2">個人應付總計</td>' + optionNames.map(() => '<td></td>').join('') + '<td class="sticky-col-3">-</td>';
     members.forEach(member => {
         const td = document.createElement("td");
         td.id = `member_subtotal_${encodeURIComponent(member)}`;
@@ -1190,58 +1196,59 @@ function escapeMenuText(value) {
     return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+function getOptionColumnNames() {
+    return [...new Set(MENU_DATA.flatMap(item => (item.options || []).map(group => group.name)))];
+}
+
 function renderOptionPickers(tbody) {
     const seen = new Set();
+    const optionNames = getOptionColumnNames();
     MENU_DATA.forEach(item => {
         if (!item.baseId || seen.has(item.baseId)) return;
         seen.add(item.baseId);
         const row = document.createElement('tr');
-        row.innerHTML = `
-            <td class="sticky-col-1 col-category"><span class="badge-category">${escapeMenuText(item.category)}</span></td>
-            <td class="sticky-col-2">${escapeMenuText(item.baseName)}</td>
-            <td class="sticky-col-3">$${formatPrice(item.price)}</td>`;
-        let cell;
+        row.innerHTML = '<td class="sticky-col-1 col-category"><span class="badge-category">' + escapeMenuText(item.category) + '</span></td><td class="sticky-col-2">' + escapeMenuText(item.baseName) + '</td>';
+        const selects = new Map();
+        optionNames.forEach(name => {
+            const td = document.createElement('td');
+            const group = item.options.find(g => g.name === name);
+            if (group) {
+                const select = document.createElement('select');
+                select.className = 'select-store';
+                select.setAttribute('aria-label', item.baseName + ' ' + name);
+                select.disabled = !currentUser || isMenuLocked;
+                group.values.forEach(value => {
+                    const option = document.createElement('option');
+                    option.value = value; option.textContent = value;
+                    select.appendChild(option);
+                });
+                selects.set(name, select); td.appendChild(select);
+            } else td.textContent = '—';
+            row.appendChild(td);
+        });
+        const price = document.createElement('td');
+        price.className = 'sticky-col-3'; price.textContent = '$' + formatPrice(item.price);
+        row.appendChild(price);
         members.forEach(member => {
             const td = document.createElement('td');
             td.className = member === currentUser ? 'current-user-col' : 'readonly-col';
-            if (member === currentUser) cell = td;
-            else td.textContent = '—';
+            if (member === currentUser) {
+                const add = document.createElement('button');
+                add.className = 'btn-secondary'; add.textContent = '加入 1 份';
+                add.disabled = isMenuLocked;
+                add.onclick = () => {
+                    const variant = MENU_DATA.find(v => v.baseId === item.baseId && v.choices.every(c => c[1] === selects.get(c[0]).value));
+                    if (variant) { updateQty(variant.id, 1); renderTable(); calculateAll(); }
+                };
+                td.appendChild(add);
+            } else td.textContent = '—';
             row.appendChild(td);
         });
         ['col-summary-qty', 'col-summary-amount'].forEach(className => {
             const td = document.createElement('td');
-            td.className = className;
-            td.textContent = '—';
-            row.appendChild(td);
+            td.className = className; td.textContent = '—'; row.appendChild(td);
         });
         tbody.appendChild(row);
-        if (!cell) return;
-        const controls = document.createElement('div');
-        controls.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;white-space:normal';
-        cell.appendChild(controls);
-        const selects = item.options.map(group => {
-            const label = document.createElement('label');
-            label.textContent = group.name + '：';
-            label.style.cssText = 'display:flex;align-items:center;gap:4px;flex-wrap:wrap';
-            const select = document.createElement('select');
-            select.className = 'select-store';
-            select.disabled = !currentUser || isMenuLocked;
-            group.values.forEach(value => {
-                const option = document.createElement('option');
-                option.value = value; option.textContent = value; select.appendChild(option);
-            });
-            select.style.cssText = 'max-width:100%;min-width:0';
-            label.appendChild(select); controls.appendChild(label);
-            return select;
-        });
-        const add = document.createElement('button');
-        add.className = 'btn-secondary'; add.textContent = '加入 1 份';
-        add.disabled = !currentUser || isMenuLocked;
-        add.onclick = () => {
-            const variant = MENU_DATA.find(v => v.baseId === item.baseId && v.choices.every((c,i) => c[1] === selects[i].value));
-            if (variant) { updateQty(variant.id, 1); renderTable(); calculateAll(); }
-        };
-        controls.appendChild(add);
     });
 }
 
