@@ -226,6 +226,11 @@ textarea.summary-text { width: 100%; height: 260px; background-color: #121418; b
 #matrix-table thead th.frozen-left { top: 0; z-index: 15; background-color: #232833; }
 #matrix-table tfoot td.frozen-left { z-index: 11; background-color: #171a21; }
 #matrix-table .frozen-edge { border-right: 2px solid var(--border-color); }
+/* 統計表頭使用不透明底色，避免捲動中的數字透出。 */
+#matrix-table thead th.col-summary-qty,
+#matrix-table thead th.col-summary-amount { position: sticky; top: 0; z-index: 12; }
+#matrix-table thead th.col-summary-qty { background-color: #382a20; }
+#matrix-table thead th.col-summary-amount { background-color: #37301f; }
 </style>
 </head>
 <body>
