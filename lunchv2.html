@@ -13,7 +13,7 @@
   connect-src 'self' https://script.google.com https://script.googleusercontent.com https://oauth2.googleapis.com;
   frame-src https://accounts.google.com;
 ">
-<title>御膳雅集｜多人點餐</title>
+<title>午餐團｜多人點餐</title>
 <!-- 引入 Google Identity Services (GIS) SDK -->
 <script src="https://accounts.google.com/gsi/client" async defer onload="initGoogleSignIn()"></script>
 <style>
@@ -311,7 +311,7 @@ th,td {padding:13px 16px;border-bottom-color:#e2d5bc;}
 #matrix-table thead th.frozen-left,#matrix-table thead th.sticky-col-3 {background-color:#662434;}
 #matrix-table thead th.col-summary-qty {background:#773243;color:#fae6b8;}
 #matrix-table thead th.col-summary-amount {background:#583322;color:#f4d694;}
-#matrix-table tfoot tr,#matrix-table tfoot td,#matrix-table tfoot td.frozen-left {background:#eadbbc;color:#634621;border-top:2px solid #b79760;}
+#matrix-table tfoot tr,#matrix-table tfoot td,#matrix-table tfoot td.frozen-left,#matrix-table tfoot td.sticky-col-3 {background:#eadbbc;color:#634621;border-top:2px solid #b79760;}
 .badge-category {background:#f0e4cc;border:1px solid #d8c19a;color:#7b5a2e;padding:3px 8px;border-radius:2px;font-size:11px;}
 .col-summary-qty {background:#a1762710;color:#8a6228;}
 .col-summary-amount {background:#8b29380a;color:#7b2939;}
@@ -400,7 +400,7 @@ textarea.summary-text {background:#fffdf8;color:#493426;border-color:#d1b989;bor
             <div class="brand-badge" id="store-brand-badge">點餐</div>
             <div>
                 <h2 id="store-title">多店家點餐與費用統計矩陣</h2>
-                <div class="brand-subtitle">共席點餐 · 雲端同步</div>
+                <div class="brand-subtitle">點餐 · 雲端同步</div>
             </div>
         </div>
         <div class="stats-bar">
@@ -446,7 +446,7 @@ textarea.summary-text {background:#fffdf8;color:#493426;border-color:#d1b989;bor
     </div>
 </div>
 
-<div class="palace-footer">❖ &nbsp; 御膳雅集 · 佳餚共賞 &nbsp; ❖</div>
+<div class="palace-footer">❖ &nbsp; IT · 內部用 &nbsp; ❖</div>
 <!-- 店家劃單彈窗 -->
 <div class="modal-overlay" id="kitchen-modal">
     <div class="modal-content">
