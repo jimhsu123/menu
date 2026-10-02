@@ -284,13 +284,14 @@ button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-vis
 .btn-danger-outline:hover {background:#8c3342;color:#fff8e9;}
 button:disabled,.btn-submit-main:disabled{background:#e5dbc8!important;color:#887b68;opacity:1;border:1px solid #d8cbb2;box-shadow:none;}
 .sync-status-indicator {font-size:12px;color:#7c6b54;} .status-dot{width:7px;height:7px;}
-header {padding:5px 0 21px;margin-bottom:18px;border-bottom:1px solid #cbb485;gap:20px;}
+.submit-panel {margin-bottom:14px;}
+header {padding:3px 0 12px;margin-bottom:12px;border-bottom:1px solid #cbb485;gap:20px;}
 .brand-title {gap:15px;}
 .brand-badge {background:#6c2333;color:#f2dba7;border:1px solid #b58e4e;border-radius:3px;font-family:"PMingLiU",serif;box-shadow:inset 0 0 0 3px #6c2333,inset 0 0 0 4px #b58e4e;padding:12px 16px;font-size:18px;}
 .brand-title h2 {font-family:"PMingLiU","Noto Serif TC",serif;font-size:25px;font-weight:600;letter-spacing:.05em;color:#612535;}
 .brand-subtitle {font-size:12px;margin-top:6px;color:#8b765a;letter-spacing:.06em;}
 .stats-bar{gap:12px;}
-.stat-card {background:#fffbf2;border:1px solid #d5c19b;border-radius:3px;padding:12px 20px;min-width:118px;position:relative;}
+.stat-card {background:#fffbf2;border:1px solid #d5c19b;border-radius:3px;padding:9px 20px;min-width:118px;position:relative;}
 .stat-card:before {content:"";position:absolute;top:0;left:15px;right:15px;height:2px;background:#b69250;}
 .stat-label {font-size:11px;letter-spacing:.07em;margin-bottom:4px;}
 .stat-value {font-family:Georgia,"Microsoft JhengHei",serif;font-size:23px;color:#7b2939;font-variant-numeric:tabular-nums;}
@@ -336,6 +337,11 @@ textarea.summary-text {background:#fffdf8;color:#493426;border-color:#d1b989;bor
 #admin-order-items .admin-order-selected {background:#f0dfb8;border-left-color:#a67e3c;}
 #admin-order-items .order-item-chip > span {flex:1;min-width:0;overflow-wrap:anywhere;}
 #admin-order-items .qty-control {flex-shrink:0;}
+/* 全頁字型統一採用菜單表頭的字型，保留各區塊原有字級與字重。 */
+:root {--menu-font:"Microsoft JhengHei","PingFang TC",sans-serif;}
+body, button, input, select, textarea.summary-text,
+.palace-hero h1, .brand-badge, .brand-title h2, .stat-value,
+.modal-header, #matrix-table thead th {font-family:var(--menu-font);}
 .order-note-list {background:#fffbf2;border-radius:3px;border-color:#d5bd91;}
 .palace-footer {text-align:center;color:#9b815c;font-size:11px;letter-spacing:.16em;padding:22px 0 0;}
 @media(max-width:768px){
@@ -363,7 +369,7 @@ textarea.summary-text {background:#fffdf8;color:#493426;border-color:#d1b989;bor
     </div>
 
     <div class="banner-notice locked-banner" id="locked-notice-banner" style="display: none;">
-        <span>🔒 此店家已結單，菜單已被管理員鎖定，無法再進行點餐或修改。</span>
+        <span>🔒 此店家已結單。已被管理員鎖定，無法再進行點餐或修改。</span>
     </div>
 
     <div class="submit-panel">
