@@ -390,6 +390,7 @@ textarea.summary-text {background:#fffdf8;color:#493426;border-color:#d1b989;bor
     <!-- Admin Panel (管理員面板) -->
     <div class="admin-panel" id="admin-controls-panel">
         <span class="admin-panel-title">⭐ 管理員面板</span>
+        <button class="btn-secondary" onclick="openAdminOrders()">修改／刪除使用者訂單</button>
         <button class="btn-danger" id="btn-admin-lock" onclick="adminLockMenu()">🔒 結單 (鎖定菜單)</button>
         <button class="btn-success" id="btn-admin-unlock" onclick="adminUnlockMenu()" style="display: none;">🔓 解鎖菜單</button>
         <button class="btn-danger-outline" onclick="adminClearAllOrders()">🔄 重啟訂單</button>
@@ -457,6 +458,29 @@ textarea.summary-text {background:#fffdf8;color:#493426;border-color:#d1b989;bor
         <div class="modal-body" id="kitchen-list-body"></div>
         <div class="modal-footer">
             <button class="btn-primary" onclick="closeModal('kitchen-modal')">關閉</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="admin-orders-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>修改／刪除使用者訂單</h3>
+            <button class="btn-secondary" onclick="closeModal('admin-orders-modal')">×</button>
+        </div>
+        <div class="modal-body">
+            <label for="admin-member-select">訂購人</label>
+            <select id="admin-member-select" class="select-store" onchange="renderAdminOrderEditor()"></select>
+            <p id="admin-order-message"></p>
+            <div id="admin-order-items"></div>
+            <label for="admin-order-note">訂單備註</label>
+            <textarea id="admin-order-note" class="summary-text" maxlength="200" style="height:80px;min-height:80px"></textarea>
+            <p id="admin-order-total"></p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-primary" id="btn-admin-save-member" onclick="saveAdminMemberOrder()">儲存修改</button>
+            <button class="btn-danger" id="btn-admin-delete-member" onclick="deleteAdminMemberOrder()">刪除此人訂單</button>
+            <button class="btn-secondary" onclick="closeModal('admin-orders-modal')">關閉</button>
         </div>
     </div>
 </div>
@@ -797,6 +821,7 @@ function renderAdminPanelUI() {
 }
 
 function enterGuestMode() {
+    if (isSubmitting) return;
     const name = prompt("請輸入您的點餐暱稱/姓名（訪客模式）：", "訪客");
     if (!name || !name.trim()) return;
 
@@ -827,6 +852,8 @@ function enterGuestMode() {
 }
 
 function logout() {
+    if (isSubmitting) return;
+    closeModal('admin-orders-modal');
     currentUser = "";
     currentUserEmail = "";
     currentIdToken = "";
@@ -864,6 +891,11 @@ function saveLocal() {
 }
 
 function switchStore() {
+    if (isSubmitting) {
+        document.getElementById('store-select').value = currentStoreId;
+        return;
+    }
+    closeModal('admin-orders-modal');
     const newStore = document.getElementById("store-select").value;
     if (newStore === currentStoreId) return;
 
@@ -921,9 +953,9 @@ function updateUserModeUI() {
     const btnClearMyOrder = document.getElementById('btn-clear-my-order');
 
     if (currentUser && !isMenuLocked) {
-        btnSubmit.disabled = false;
+        btnSubmit.disabled = isSubmitting;
         btnSubmit.innerText = `送出 ${currentUser} 的點餐`;
-        btnClearMyOrder.disabled = false;
+        btnClearMyOrder.disabled = isSubmitting;
     } else {
         btnSubmit.disabled = true;
         btnClearMyOrder.disabled = true;
@@ -933,14 +965,16 @@ function updateUserModeUI() {
 }
 
 async function fetchFromGoogleDrive(isManual = false) {
-    if (!GOOGLE_GAS_API_URL) return;
+    if (!GOOGLE_GAS_API_URL || (isManual && isSubmitting)) return;
+    const requestedStoreId = currentStoreId;
     updateStatus("syncing", "正在讀取最新資料...");
     try {
-        const resp = await fetch(`${GOOGLE_GAS_API_URL}?storeId=${encodeURIComponent(currentStoreId)}`, {
+        const resp = await fetch(`${GOOGLE_GAS_API_URL}?storeId=${encodeURIComponent(requestedStoreId)}`, {
             method: "GET",
             redirect: "follow"
         });
         const resJson = await resp.json();
+        if (requestedStoreId !== currentStoreId) return;
 
         if (resJson.status === "success") {
             const data = resJson.data;
@@ -958,10 +992,6 @@ async function fetchFromGoogleDrive(isManual = false) {
 
             document.getElementById('locked-notice-banner').style.display = isMenuLocked ? 'block' : 'none';
 
-            if (currentUser && !members.includes(currentUser)) {
-                members.push(currentUser);
-                if (!orders[currentUser]) orders[currentUser] = {};
-            }
 
             saveLocal();
             renderOrderNotes();
@@ -982,6 +1012,7 @@ async function fetchFromGoogleDrive(isManual = false) {
 }
 
 function renderTable() {
+    const tableMembers = getTableMembers();
     const theadRow = document.getElementById("table-header-row");
     const tfootRow = document.getElementById("table-foot-row");
     const tbody = document.getElementById("matrix-tbody");
@@ -991,7 +1022,7 @@ function renderTable() {
     theadRow.innerHTML = '<th class="sticky-col-1 col-category">分類</th><th class="sticky-col-2">品項名稱</th>' + optionHeaders + '<th class="sticky-col-3">單價</th>';
     tbody.closest('table').classList.toggle('has-option-columns', optionNames.length > 0);
 
-    members.forEach(member => {
+    tableMembers.forEach(member => {
         const th = document.createElement("th");
         th.innerText = member;
         th.className = (member === currentUser) ? "current-user-col" : "readonly-col";
@@ -1010,7 +1041,7 @@ function renderTable() {
 
     tbody.innerHTML = "";
     if (MENU_DATA.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="${members.length + optionNames.length + 5}" style="text-align:center; padding: 2rem; color: var(--text-muted);">正在載入菜單，或此店家無菜單資料...</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${tableMembers.length + optionNames.length + 5}" style="text-align:center; padding: 2rem; color: var(--text-muted);">正在載入菜單，或此店家無菜單資料...</td></tr>`;
     }
     renderOptionPickers(tbody);
     MENU_DATA.forEach(item => {
@@ -1024,7 +1055,7 @@ function renderTable() {
             <td class="sticky-col-3">$${item.price}</td>
         `;
 
-        members.forEach(member => {
+        tableMembers.forEach(member => {
             const td = document.createElement("td");
             const userQty = (orders[member] && orders[member][item.id]) ? orders[member][item.id] : 0;
             if (member === currentUser) {
@@ -1050,7 +1081,7 @@ function renderTable() {
     });
 
     tfootRow.innerHTML = '<td class="sticky-col-1 col-category">統計</td><td class="sticky-col-2">個人應付總計</td>' + optionNames.map(() => '<td></td>').join('') + '<td class="sticky-col-3">-</td>';
-    members.forEach(member => {
+    tableMembers.forEach(member => {
         const td = document.createElement("td");
         td.id = `member_subtotal_${encodeURIComponent(member)}`;
         if (member === currentUser) td.className = "current-user-col";
@@ -1071,9 +1102,15 @@ function renderTable() {
     updateFrozenColumns();
 }
 
+function getTableMembers() {
+    return currentUser && !members.includes(currentUser) ? [...members, currentUser] : members;
+}
+
 function updateQty(itemId, delta) {
+    if (isSubmitting) return;
     if (!currentUser) { alert("請先登入或使用訪客模式！"); return; }
     if (isMenuLocked) { alert("菜單已被鎖定，無法修改！"); return; }
+    if (!members.includes(currentUser)) members.push(currentUser);
     if (!orders[currentUser]) orders[currentUser] = {};
     let currentVal = Number(orders[currentUser][itemId] || 0);
     currentVal = Math.min(99, Math.max(0, currentVal + delta));
@@ -1163,12 +1200,15 @@ async function submitMyOrderToCloud() {
 
         const resJson = await resp.json();
         if (resJson.status === "success") {
-            if (orderNote) orderNotes[currentUser] = orderNote;
-            else delete orderNotes[currentUser];
+            members = resJson.data.members || [];
+            orders = resJson.data.orders || {};
+            orderNotes = {...(resJson.data.notes || {}), ...(resJson.data.orderNotes || {})};
+            const removed = !members.includes(currentUser);
             saveLocal();
             renderOrderNotes();
             updateStatus("online", "訂單已成功儲存！");
-            alert(`🎉 恭喜！${currentUser} 的點餐已送出！`);
+            renderTable(); calculateAll(); updateOrderNoteInput();
+            alert(removed ? '訂單金額為 0，已清除此店家的訂購人資料、餐點與備註。' : '🎉 恭喜！' + currentUser + ' 的點餐已送出！');
             await fetchFromGoogleDrive(false);
         } else {
             throw new Error(resJson.message);
@@ -1183,7 +1223,7 @@ async function submitMyOrderToCloud() {
     }
 }
 
-async function adminAction(action, confirmMsg) {
+async function adminAction(action, confirmMsg, details = {}) {
     if (!currentIdToken) {
         alert("此操作需要管理員權限，請先透過 Google 帳號登入！");
         triggerGoogleSignIn();
@@ -1202,9 +1242,12 @@ async function adminAction(action, confirmMsg) {
 
     isSubmitting = true;
     updateStatus("syncing", "正在執行管理員操作...");
+    updateUserModeUI();
+    setAdminEditorBusy(true);
 
     try {
         const payload = {
+            ...details,
             action: action,
             storeId: currentStoreId,
             storeName: ALL_STORES[currentStoreId]?.name || currentStoreId,
@@ -1222,6 +1265,13 @@ async function adminAction(action, confirmMsg) {
         const resJson = await resp.json();
         if (resJson.status === "success") {
             updateStatus("online", "管理員操作完成！");
+            members = resJson.data.members || [];
+            orders = resJson.data.orders || {};
+            orderNotes = {...(resJson.data.notes || {}), ...(resJson.data.orderNotes || {})};
+            isMenuLocked = !!resJson.data.isLocked;
+            saveLocal(); renderTable(); calculateAll(); renderOrderNotes();
+            updateUserModeUI(); renderAdminPanelUI();
+            closeModal('admin-orders-modal');
             alert("✅ 操作成功！");
             await fetchFromGoogleDrive(false);
         } else {
@@ -1233,10 +1283,13 @@ async function adminAction(action, confirmMsg) {
         alert("❌ 操作失敗：" + err.message);
     } finally {
         isSubmitting = false;
+        updateUserModeUI();
+        setAdminEditorBusy(false);
     }
 }
 
 function clearMyOrder() {
+    if (isSubmitting) return;
     if (!currentUser) return;
     if (confirm(`確定要清空 ${currentUser} 在此店家的所有餐點數量嗎？`)) {
         orders[currentUser] = {};
@@ -1261,6 +1314,97 @@ function adminLockMenu() {
 
 function adminUnlockMenu() {
     adminAction('admin_unlock_menu', '確定要解鎖此菜單嗎？解鎖後所有人將可以重新編輯。');
+}
+
+let adminEditorStore = '';
+let adminEditorInputs = [];
+
+function setAdminEditorBusy(busy) {
+    ['btn-admin-save-member', 'btn-admin-delete-member', 'admin-member-select', 'admin-order-note'].forEach(id => {
+        document.getElementById(id).disabled = busy || !document.getElementById('admin-member-select').value;
+    });
+    adminEditorInputs.forEach(({input}) => input.disabled = busy);
+}
+
+function openAdminOrders() {
+    if (!isCurrentUserAdmin || isSubmitting) return;
+    adminEditorStore = currentStoreId;
+    const select = document.getElementById('admin-member-select');
+    select.replaceChildren();
+    members.filter(member => Object.prototype.hasOwnProperty.call(orders, member)).forEach(member => {
+        const option = document.createElement('option');
+        option.value = member; option.textContent = member;
+        select.appendChild(option);
+    });
+    renderAdminOrderEditor();
+    document.getElementById('admin-orders-modal').style.display = 'flex';
+}
+
+function renderAdminOrderEditor() {
+    const member = document.getElementById('admin-member-select').value;
+    const list = document.getElementById('admin-order-items');
+    list.replaceChildren(); adminEditorInputs = [];
+    document.getElementById('admin-order-message').textContent = member
+        ? '可在結單後修改。金額為 0 時會移除此人的訂單資料。'
+        : '目前沒有可管理的使用者訂單。';
+    document.getElementById('admin-order-note').value = member ? normalizeOrderNote(orderNotes[member]) : '';
+    if (member) {
+        const known = new Set(MENU_DATA.map(item => item.id));
+        const items = [...MENU_DATA, ...Object.keys(orders[member] || {}).filter(id => !known.has(id))
+            .map(id => ({id, name: '已下架品項：' + id, price: null, category: '舊品項'}))];
+        items.forEach(item => {
+            const label = document.createElement('label');
+            label.className = 'order-item-chip';
+            const name = document.createElement('span');
+            name.textContent = '[' + item.category + '] ' + item.name +
+                (item.price === null ? '（請設為 0 移除後再儲存）' : ' $' + formatPrice(item.price));
+            const input = document.createElement('input');
+            input.type = 'number'; input.min = '0'; input.max = '99'; input.step = '1';
+            input.style.width = '70px'; input.value = Number((orders[member] || {})[item.id] || 0);
+            input.setAttribute('aria-label', item.name + ' 數量');
+            input.oninput = updateAdminOrderTotal;
+            label.append(name, input); list.appendChild(label);
+            adminEditorInputs.push({item, input});
+        });
+    }
+    setAdminEditorBusy(isSubmitting);
+    updateAdminOrderTotal();
+}
+
+function updateAdminOrderTotal() {
+    const total = adminEditorInputs.reduce((sum, {item, input}) => sum + Number(input.value || 0) * (item.price || 0), 0);
+    document.getElementById('admin-order-total').textContent = '修改後金額：NT$ ' + formatAmount(total);
+}
+
+function saveAdminMemberOrder() {
+    if (isSubmitting || !isCurrentUserAdmin || adminEditorStore !== currentStoreId) return;
+    const member = document.getElementById('admin-member-select').value;
+    if (!member) return;
+    const memberOrders = {};
+    for (const {item, input} of adminEditorInputs) {
+        const qty = Number(input.value);
+        if (input.value === '' || !Number.isInteger(qty) || qty < 0 || qty > 99) {
+            alert('數量須為 0 到 99 的整數。'); input.focus(); return;
+        }
+        if (qty > 0 && item.price === null) {
+            alert('已下架品項請先設為 0；也可以直接刪除此人訂單。'); input.focus(); return;
+        }
+        if (qty > 0) Object.defineProperty(memberOrders, item.id, {value: qty, enumerable: true});
+    }
+    const total = adminEditorInputs.reduce((sum, {item, input}) => sum + Number(input.value) * (item.price || 0), 0);
+    adminAction('admin_update_member', total === 0
+        ? '修改後金額為 0，將清除 ' + member + ' 的訂單、姓名與備註，確定繼續？'
+        : '確定儲存 ' + member + ' 的訂單修改？', {
+        targetMember: member, memberOrders,
+        orderNote: normalizeOrderNote(document.getElementById('admin-order-note').value)
+    });
+}
+
+function deleteAdminMemberOrder() {
+    if (isSubmitting || !isCurrentUserAdmin || adminEditorStore !== currentStoreId) return;
+    const member = document.getElementById('admin-member-select').value;
+    if (!member) return;
+    adminAction('admin_delete_member', '確定刪除 ' + member + ' 在此店家的訂單、姓名與備註？', {targetMember: member});
 }
 
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
@@ -1373,7 +1517,7 @@ function renderOptionPickers(tbody) {
         price.className = 'sticky-col-3'; price.textContent = '$' + formatPrice(item.price);
         row.appendChild(price);
         const selectedVariant = () => MENU_DATA.find(v => v.baseId === item.baseId && v.choices.every(c => c[1] === selects.get(c[0]).value));
-        members.forEach(member => {
+        getTableMembers().forEach(member => {
             const td = document.createElement('td');
             td.className = member === currentUser ? 'current-user-col' : 'readonly-col';
             let value;
