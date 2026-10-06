@@ -358,6 +358,25 @@ body, button, input, select, textarea.summary-text,
 }
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;}}
 
+
+/* 與宮廷菜單一致的確認、通知與輸入視窗。 */
+.palace-dialog {position:fixed;inset:0;margin:auto;padding:0;width:calc(100% - 32px);max-width:480px;max-height:calc(100dvh - 32px);overflow:auto;color:var(--text-main);background:#fffaf0;border:1px solid #b39050;border-radius:6px;box-shadow:0 24px 80px #16071066;font-family:var(--menu-font);}
+.palace-dialog::backdrop {background:#29151bb3;backdrop-filter:blur(4px);}
+.palace-dialog [hidden] {display:none!important;}
+.palace-dialog-top {position:relative;height:44px;color:#f4e5bc;background:radial-gradient(ellipse at 50% -40%,#a45355 0,transparent 70%),linear-gradient(115deg,#4b1524,#762638 52%,#471421);border-bottom:1px solid #b58b48;}
+.palace-dialog h2 {position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0;}
+.palace-dialog-close {position:absolute;top:6px;right:10px;padding:0;width:32px;min-height:32px;justify-content:center;border:1px solid #d6b87955;background:transparent;color:#ead8ba;font-size:21px;border-radius:3px;}
+.palace-dialog-close:hover {background:#ffffff12;}
+.palace-dialog-body {padding:25px 28px 27px;}
+.palace-dialog-message {white-space:pre-wrap;overflow-wrap:anywhere;color:#5d4637;font-size:15px;line-height:1.9;}
+.palace-dialog-field {margin-top:18px;}
+.palace-dialog-field[hidden] {display:none;}
+.palace-dialog-field label {display:block;margin-bottom:7px;font-size:13px;font-weight:600;color:#785932;}
+.palace-dialog-field input {display:block;width:100%;padding:11px 12px;border:1px solid #c7af80;border-radius:3px;background:#fffdf8;color:#382723;font:inherit;font-size:15px;}
+.palace-dialog-actions {display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;padding:17px 28px;background:#f5ebd8;border-top:1px solid #dfcfb1;}
+.palace-dialog-actions button {min-width:104px;justify-content:center;min-height:42px;}
+@media(max-width:480px){.palace-dialog-body{padding:22px 20px;}.palace-dialog-actions{padding:16px 20px;}.palace-dialog-actions button{flex:1;min-width:0;}}
+
 </style>
 </head>
 <body>
@@ -512,7 +531,93 @@ body, button, input, select, textarea.summary-text,
     </div>
 </div>
 
+
+<!-- 原生 dialog 提供焦點限制與背景隔離，文字以 textContent 安全填入。 -->
+<dialog id="palace-dialog" class="palace-dialog" aria-labelledby="palace-dialog-title" aria-describedby="palace-dialog-message">
+  <div class="palace-dialog-top">
+    <h2 id="palace-dialog-title">操作確認</h2>
+    <button type="button" id="palace-dialog-close" class="palace-dialog-close" aria-label="關閉視窗">×</button>
+  </div>
+  <div class="palace-dialog-body">
+    <p id="palace-dialog-message" class="palace-dialog-message"></p>
+    <div id="palace-dialog-field" class="palace-dialog-field" hidden>
+      <label id="palace-dialog-label" for="palace-dialog-input">請輸入</label>
+      <input id="palace-dialog-input" type="text" autocomplete="off">
+    </div>
+  </div>
+  <div class="palace-dialog-actions">
+    <button type="button" id="palace-dialog-cancel" class="btn-secondary">取消</button>
+    <button type="button" id="palace-dialog-accept" class="btn-primary">確定</button>
+  </div>
+</dialog>
+
 <script>
+
+// 每次只顯示一則訊息，避免背景同步提示蓋過使用者的確認。
+const palaceDialogQueue = [];
+let palaceDialogActive = false;
+function showPalaceDialog(message, options = {}) {
+    return new Promise(resolve => {
+        palaceDialogQueue.push({message, options, resolve});
+        displayNextPalaceDialog();
+    });
+}
+function displayNextPalaceDialog() {
+    if (palaceDialogActive || !palaceDialogQueue.length) return;
+    palaceDialogActive = true;
+    const {message, options, resolve} = palaceDialogQueue.shift();
+    const dialog = document.getElementById('palace-dialog');
+    const input = document.getElementById('palace-dialog-input');
+    const cancel = document.getElementById('palace-dialog-cancel');
+    const accept = document.getElementById('palace-dialog-accept');
+    const previousFocus = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    const kind = options.kind || 'alert';
+    const canceledValue = kind === 'prompt' ? null : kind === 'confirm' ? false : undefined;
+    let value = canceledValue;
+    document.getElementById('palace-dialog-title').textContent = options.title || (kind === 'alert' ? '溫馨提醒' : kind === 'prompt' ? '填寫資料' : '操作確認');
+    document.getElementById('palace-dialog-message').textContent = String(message);
+    document.getElementById('palace-dialog-field').hidden = kind !== 'prompt';
+    document.getElementById('palace-dialog-label').textContent = options.label || '請輸入';
+    input.value = options.defaultValue || '';
+    cancel.hidden = kind === 'alert';
+    accept.textContent = options.confirmText || (kind === 'alert' ? '我知道了' : '確定');
+    const dismiss = () => dialog.close();
+    accept.onclick = () => {
+        value = kind === 'prompt' ? input.value : kind === 'confirm' ? true : undefined;
+        dialog.close();
+    };
+    cancel.onclick = dismiss;
+    document.getElementById('palace-dialog-close').onclick = dismiss;
+    dialog.oncancel = event => { event.preventDefault(); dismiss(); };
+    // 確認視窗預設聚焦取消；Enter 依目前焦點操作，避免意外清空資料。
+    input.onkeydown = event => {
+        if (event.key === 'Enter' && !event.isComposing) {
+            event.preventDefault(); accept.click();
+        }
+    };
+    dialog.onclose = () => {
+        palaceDialogActive = false;
+        document.body.style.overflow = previousOverflow;
+        if (previousFocus && previousFocus.isConnected) previousFocus.focus({preventScroll:true});
+        resolve(value);
+        displayNextPalaceDialog();
+    };
+    document.body.style.overflow = 'hidden';
+    dialog.showModal();
+    if (kind === 'prompt') { input.focus(); input.select(); }
+    else (kind === 'confirm' ? cancel : accept).focus();
+}
+function palaceAlert(message, options = {}) {
+    return showPalaceDialog(message, {...options, kind:'alert'});
+}
+function palaceConfirm(message, options = {}) {
+    return showPalaceDialog(message, {...options, kind:'confirm'});
+}
+function palacePrompt(message, defaultValue = '', options = {}) {
+    return showPalaceDialog(message, {...options, kind:'prompt', defaultValue});
+}
+
 // ===================================================================
 // ======== 公開設定參數 =============================================
 // ===================================================================
@@ -750,7 +855,7 @@ async function handleCredentialResponse(response) {
 
     const decodedToken = jwt_decode(currentIdToken);
     if (!decodedToken) {
-        alert("Google 憑證解析失敗！");
+        palaceAlert("Google 憑證解析失敗！");
         return;
     }
 
@@ -830,9 +935,9 @@ function renderAdminPanelUI() {
     }
 }
 
-function enterGuestMode() {
+async function enterGuestMode() {
     if (isSubmitting) return;
-    const name = prompt("請輸入您的點餐暱稱/姓名（訪客模式）：", "訪客");
+    const name = await palacePrompt("請輸入您的點餐暱稱或姓名，以便辨識您的訂單。", "訪客", {title:"訪客點餐", label:"暱稱／姓名", confirmText:"開始點餐"});
     if (!name || !name.trim()) return;
 
     currentUser = name.trim();
@@ -991,7 +1096,7 @@ async function fetchFromGoogleDrive(isManual = false) {
 
             if (data.warning) {
                 console.warn(data.warning);
-                alert(data.warning);
+                palaceAlert(data.warning);
             }
 
             members = data.members || [];
@@ -1017,7 +1122,7 @@ async function fetchFromGoogleDrive(isManual = false) {
     } catch (err) {
         console.error(err);
         updateStatus("offline", "雲端讀取失敗，使用本地暫存");
-        if (isManual) alert("雲端讀取失敗：" + err.message);
+        if (isManual) palaceAlert("雲端讀取失敗：" + err.message);
     }
 }
 
@@ -1113,13 +1218,14 @@ function renderTable() {
 }
 
 function getTableMembers() {
-    return currentUser && !members.includes(currentUser) ? [...members, currentUser] : members;
+    // 僅調整畫面顯示順序，保留 members 原始順序供儲存及登出使用。
+    return currentUser ? [currentUser, ...members.filter(member => member !== currentUser)] : members;
 }
 
 function updateQty(itemId, delta) {
     if (isSubmitting) return;
-    if (!currentUser) { alert("請先登入或使用訪客模式！"); return; }
-    if (isMenuLocked) { alert("菜單已被鎖定，無法修改！"); return; }
+    if (!currentUser) { palaceAlert("請先登入或使用訪客模式！"); return; }
+    if (isMenuLocked) { palaceAlert("菜單已被鎖定，無法修改！"); return; }
     if (!members.includes(currentUser)) members.push(currentUser);
     if (!orders[currentUser]) orders[currentUser] = {};
     let currentVal = Number(orders[currentUser][itemId] || 0);
@@ -1173,13 +1279,13 @@ function calculateAll() {
 }
 
 async function submitMyOrderToCloud() {
-    if (!currentUser) { alert("請先登入！"); return; }
+    if (!currentUser) { palaceAlert("請先登入！"); return; }
     if (isSubmitting) return;
 
     const orderNote = normalizeOrderNote(document.getElementById('order-note-input').value);
 
     if (!isGuestModeActive && !isTokenValid(currentIdToken)) {
-        alert("登入憑證已過期，請點擊「重新登入」刷新憑證後再送出！");
+        await palaceAlert("登入憑證已過期，請點擊「重新登入」刷新憑證後再送出！");
         triggerGoogleSignIn();
         return;
     }
@@ -1218,7 +1324,7 @@ async function submitMyOrderToCloud() {
             renderOrderNotes();
             updateStatus("online", "訂單已成功儲存！");
             renderTable(); calculateAll(); updateOrderNoteInput();
-            alert(removed ? '訂單金額為 0，已清除此店家的訂購人資料、餐點與備註。' : '🎉 恭喜！' + currentUser + ' 的點餐已送出！');
+            palaceAlert(removed ? '訂單金額為 0，已清除此店家的訂購人資料、餐點與備註。' : '🎉 恭喜！' + currentUser + ' 的點餐已送出！');
             await fetchFromGoogleDrive(false);
         } else {
             throw new Error(resJson.message);
@@ -1226,7 +1332,7 @@ async function submitMyOrderToCloud() {
     } catch (err) {
         console.error(err);
         updateStatus("offline", "送出失敗：" + err.message);
-        alert(`送出失敗：${err.message}`);
+        palaceAlert(`送出失敗：${err.message}`);
     } finally {
         isSubmitting = false;
         updateUserModeUI();
@@ -1235,20 +1341,21 @@ async function submitMyOrderToCloud() {
 
 async function adminAction(action, confirmMsg, details = {}) {
     if (!currentIdToken) {
-        alert("此操作需要管理員權限，請先透過 Google 帳號登入！");
+        await palaceAlert("此操作需要管理員權限，請先透過 Google 帳號登入！");
         triggerGoogleSignIn();
         return;
     }
 
     // 檢查 Token 是否仍在有效期限內
     if (!isTokenValid(currentIdToken)) {
-        alert("⚠️ 您的 Google 登入憑證已超過 1 小時有效期限，請先重新點擊登入以獲取新憑證！");
+        await palaceAlert("⚠️ 您的 Google 登入憑證已超過 1 小時有效期限，請先重新點擊登入以獲取新憑證！");
         triggerGoogleSignIn();
         return;
     }
 
     if (isSubmitting) return;
-    if (confirmMsg && !confirm(confirmMsg)) return;
+    if (confirmMsg && !await palaceConfirm(confirmMsg)) return;
+    if (isSubmitting || !currentIdToken || !isTokenValid(currentIdToken)) return;
 
     isSubmitting = true;
     updateStatus("syncing", "正在執行管理員操作...");
@@ -1282,7 +1389,7 @@ async function adminAction(action, confirmMsg, details = {}) {
             saveLocal(); renderTable(); calculateAll(); renderOrderNotes();
             updateUserModeUI(); renderAdminPanelUI();
             closeModal('admin-orders-modal');
-            alert("✅ 操作成功！");
+            palaceAlert("✅ 操作成功！");
             await fetchFromGoogleDrive(false);
         } else {
             throw new Error(resJson.message);
@@ -1290,7 +1397,7 @@ async function adminAction(action, confirmMsg, details = {}) {
     } catch (err) {
         console.error(err);
         updateStatus("offline", "操作失敗：" + err.message);
-        alert("❌ 操作失敗：" + err.message);
+        palaceAlert("❌ 操作失敗：" + err.message);
     } finally {
         isSubmitting = false;
         updateUserModeUI();
@@ -1298,10 +1405,10 @@ async function adminAction(action, confirmMsg, details = {}) {
     }
 }
 
-function clearMyOrder() {
+async function clearMyOrder() {
     if (isSubmitting) return;
     if (!currentUser) return;
-    if (confirm(`確定要清空 ${currentUser} 在此店家的所有餐點數量嗎？`)) {
+    if (await palaceConfirm(`確定要清空 ${currentUser} 在此店家的所有餐點數量嗎？`)) {
         orders[currentUser] = {};
         saveLocal();
         renderTable();
@@ -1309,12 +1416,12 @@ function clearMyOrder() {
     }
 }
 
-function adminClearAllOrders() {
-    const promptResponse = prompt("⚠️ 注意：此動作將清空此店家【所有同仁的點餐資料】並【自動解鎖菜單】重新開放點餐！\n\n請輸入 `RESET` 確認執行：");
+async function adminClearAllOrders() {
+    const promptResponse = await palacePrompt("⚠️ 注意：此動作將清空此店家【所有同仁的點餐資料】並【自動解鎖菜單】重新開放點餐！\n\n請輸入 `RESET` 確認執行：");
     if (promptResponse === "RESET") {
         adminAction('admin_clear_all', null);
     } else if (promptResponse !== null) {
-        alert("輸入代碼不符，操作已取消。");
+        palaceAlert("輸入代碼不符，操作已取消。");
     }
 }
 
@@ -1409,7 +1516,7 @@ function updateAdminOrderTotal() {
     document.getElementById('admin-order-total').textContent = '修改後金額：NT$ ' + formatAmount(total);
 }
 
-function saveAdminMemberOrder() {
+async function saveAdminMemberOrder() {
     if (isSubmitting || !isCurrentUserAdmin || adminEditorStore !== currentStoreId) return;
     const member = document.getElementById('admin-member-select').value;
     if (!member) return;
@@ -1417,10 +1524,10 @@ function saveAdminMemberOrder() {
     for (const {item, input} of adminEditorInputs) {
         const qty = Number(input.value);
         if (input.value === '' || !Number.isInteger(qty) || qty < 0 || qty > 99) {
-            alert('數量須為 0 到 99 的整數。'); input.focus(); return;
+            await palaceAlert('數量須為 0 到 99 的整數。'); input.focus(); return;
         }
         if (qty > 0 && item.price === null) {
-            alert('已下架品項請先設為 0；也可以直接刪除此人訂單。'); input.focus(); return;
+            await palaceAlert('已下架品項請先設為 0；也可以直接刪除此人訂單。'); input.focus(); return;
         }
         if (qty > 0) Object.defineProperty(memberOrders, item.id, {value: qty, enumerable: true});
     }
@@ -1495,11 +1602,11 @@ function copyShareText() {
     const area = document.getElementById("share-text-area");
     area.select();
     try {
-        navigator.clipboard.writeText(area.value).then(() => alert("已成功複製 LINE 明細至剪貼簿！"))
-        .catch(() => { document.execCommand("copy"); alert("已複製到剪貼簿 (備用模式)！"); });
+        navigator.clipboard.writeText(area.value).then(() => palaceAlert("已成功複製 LINE 明細至剪貼簿！"))
+        .catch(() => { document.execCommand("copy"); palaceAlert("已複製到剪貼簿 (備用模式)！"); });
     } catch (e) {
         document.execCommand("copy");
-        alert("已複製到剪貼簿 (備用模式)！");
+        palaceAlert("已複製到剪貼簿 (備用模式)！");
     }
 }
 
@@ -1619,9 +1726,10 @@ async function loadLastOrder() {
         const result = await resp.json();
         if (storeId !== currentStoreId || user !== currentUser || token !== currentIdToken) return;
         if (result.status !== 'success') throw new Error(result.message);
-        if (!result.data) { alert('此使用者在這家店尚無上次訂單。'); return; }
+        if (!result.data) { palaceAlert('此使用者在這家店尚無上次訂單。'); return; }
         if (isMenuLocked) return;
-        if (!confirm('將以上次訂單取代目前尚未送出的餐點與備註，是否帶入？')) return;
+        if (!await palaceConfirm('將以上次訂單取代目前尚未送出的餐點與備註，是否帶入？', {title:'帶入上次訂單', confirmText:'帶入訂單'})) return;
+        if (storeId !== currentStoreId || user !== currentUser || token !== currentIdToken || isMenuLocked) return;
         const valid = new Set(MENU_DATA.map(i => i.id));
         const restored = {}, skipped = [];
         Object.entries(result.data.orders || {}).forEach(([id, qty]) => {
@@ -1632,8 +1740,8 @@ async function loadLastOrder() {
         if (!members.includes(user)) members.push(user);
         orderNotes[user] = normalizeOrderNote(result.data.orderNote);
         saveLocal(); renderTable(); calculateAll(); renderOrderNotes();
-        alert('已帶入上次訂單，金額依目前菜單計算；確認後請按送出。' + (skipped.length ? `\n${skipped.length} 個已移除或變更的品項／選項未帶入。` : ''));
-    } catch (err) { alert('讀取上次訂單失敗：' + err.message); }
+        palaceAlert('已帶入上次訂單，金額依目前菜單計算；確認後請按送出。' + (skipped.length ? `\n${skipped.length} 個已移除或變更的品項／選項未帶入。` : ''));
+    } catch (err) { palaceAlert('讀取上次訂單失敗：' + err.message); }
     finally { isSubmitting = false; updateUserModeUI(); }
 }
 
