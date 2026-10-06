@@ -101,7 +101,7 @@ header {
   background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));
   color: white; font-weight: 800; padding: 5px 12px; border-radius: 8px; font-size: 1.2rem;
 }
-.brand-subtitle { color: var(--text-muted); font-size: 0.82rem; }
+.brand-subtitle { color: var(--text-muted); font-size: 0.82rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 .stats-bar { display: flex; gap: 10px; flex-wrap: wrap; }
 .stat-card { background-color: var(--card-bg); border: 1px solid var(--border-color); padding: 6px 14px; border-radius: 8px; text-align: right; }
 .stat-label { font-size: 0.72rem; color: var(--text-muted); }
@@ -430,7 +430,7 @@ body, button, input, select, textarea.summary-text,
             <div class="brand-badge" id="store-brand-badge">點餐</div>
             <div>
                 <h2 id="store-title">多店家點餐與費用統計矩陣</h2>
-                <div class="brand-subtitle">點餐 · 雲端同步</div>
+                <div class="brand-subtitle" id="store-message" hidden></div>
             </div>
         </div>
         <div class="stats-bar">
@@ -1048,7 +1048,10 @@ function renderStoreSelect() {
 function updateBrand() {
     const storeInfo = ALL_STORES[currentStoreId] || { name: "載入中..." };
     document.getElementById('store-brand-badge').innerText = storeInfo.name.substring(0, 2);
-    document.getElementById('store-title').innerText = `${storeInfo.name} - 多人點餐統計`;
+    document.getElementById('store-title').textContent = storeInfo.name;
+    const message = document.getElementById('store-message');
+    message.textContent = String(storeInfo.message == null ? '' : storeInfo.message).trim();
+    message.hidden = !message.textContent;
 }
 
 function updateStatus(type, msg) {
@@ -1093,6 +1096,13 @@ async function fetchFromGoogleDrive(isManual = false) {
 
         if (resJson.status === "success") {
             const data = resJson.data;
+            if (data.storeInfo) {
+                Object.defineProperty(ALL_STORES, requestedStoreId, {
+                    value: data.storeInfo, enumerable: true, configurable: true, writable: true
+                });
+                renderStoreSelect();
+                updateBrand();
+            }
 
             if (data.warning) {
                 console.warn(data.warning);
