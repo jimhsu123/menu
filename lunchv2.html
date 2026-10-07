@@ -1288,6 +1288,32 @@ function calculateAll() {
     optionRowRefreshers.forEach(refresh => refresh());
 }
 
+function buildMyOrderReceipt(storeName, member, menu, memberOrders, note) {
+    const lines = [
+        '✅ 點餐已送出！',
+        '🍱【' + storeName + ' 訂單明細】',
+        '👤 訂購人：' + member,
+        '------------------------------------'
+    ];
+    let totalQuantity = 0;
+    let totalAmount = 0;
+    menu.forEach(item => {
+        const quantity = Number(memberOrders[item.id] || 0);
+        if (quantity <= 0) return;
+        const subtotal = quantity * Number(item.price);
+        totalQuantity += quantity;
+        totalAmount += subtotal;
+        lines.push(item.name + ' × ' + quantity);
+        lines.push('   單價 NT$ ' + formatPrice(item.price) + '｜小計 NT$ ' + formatAmount(subtotal));
+    });
+    const normalizedNote = normalizeOrderNote(note);
+    if (normalizedNote) lines.push('📝 備註：' + normalizedNote);
+    lines.push('------------------------------------');
+    lines.push('📦 總數量：' + totalQuantity);
+    lines.push('💰 下單金額：NT$ ' + formatAmount(totalAmount));
+    return lines.join('\n');
+}
+
 async function submitMyOrderToCloud() {
     if (!currentUser) { palaceAlert("請先登入！"); return; }
     if (isSubmitting) return;
@@ -1334,7 +1360,10 @@ async function submitMyOrderToCloud() {
             renderOrderNotes();
             updateStatus("online", "訂單已成功儲存！");
             renderTable(); calculateAll(); updateOrderNoteInput();
-            palaceAlert(removed ? '訂單金額為 0，已清除此店家的訂購人資料、餐點與備註。' : '🎉 恭喜！' + currentUser + ' 的點餐已送出！');
+            palaceAlert(removed ? '訂單金額為 0，已清除此店家的訂購人資料、餐點與備註。'
+                : buildMyOrderReceipt(payload.storeName, payload.targetMember, payload.menuSummary,
+                    orders[payload.targetMember] || {}, orderNotes[payload.targetMember]),
+                {title: '訂單送出結果'});
             await fetchFromGoogleDrive(false);
         } else {
             throw new Error(resJson.message);
