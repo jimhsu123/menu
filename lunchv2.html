@@ -1288,9 +1288,9 @@ function calculateAll() {
     optionRowRefreshers.forEach(refresh => refresh());
 }
 
-function buildMyOrderReceipt(member, menu, memberOrders, note) {
+function buildMyOrderReceipt(storeName, member, menu, memberOrders, note) {
     const lines = [
-        '✅ 訂購人：' + member + '點餐已送出！',
+        '✅ ' + member + '點餐已送出',
         '------------------------------------'
     ];
     let totalQuantity = 0;
