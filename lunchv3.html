@@ -430,6 +430,7 @@ body, button, input, select, textarea.summary-text,
     <!-- Admin Panel (管理員面板) -->
     <div class="admin-panel" id="admin-controls-panel">
         <span class="admin-panel-title">⭐ 管理員面板</span>
+        <button class="btn-secondary" id="btn-system-announcement" onclick="openSystemAnnouncement()">系統公告</button>
         <button class="btn-secondary" onclick="openAdminWallets()">Google 帳號儲值管理</button>
         <button class="btn-secondary" onclick="openAdminOrders()">修改／刪除使用者訂單</button>
         <button class="btn-danger" id="btn-admin-lock" onclick="adminLockMenu()">🔒 結單 (鎖定菜單)</button>
@@ -661,6 +662,8 @@ const GOOGLE_CLIENT_ID = "332175692979-nkrni08k8fleg7te2uju417rmc207vlv.apps.goo
 // ======== 核心狀態與變數 =========================
 // ===============================================
 let ALL_STORES = {};
+let systemAnnouncement = null;
+let startupAnnouncementShown = false;
 let MENU_DATA = [];
 let members = [];
 let orders = {};
@@ -822,8 +825,38 @@ async function loadStoreList() {
     const resJson = await resp.json();
     if (resJson.status === "success") {
         ALL_STORES = resJson.data;
+        systemAnnouncement = resJson.announcement || null;
+        // 不等待使用者關閉公告，初始化與菜單載入繼續進行。
+        showStartupAnnouncement();
     } else {
         throw new Error(resJson.message || "取得店家列表失敗");
+    }
+}
+
+function showStartupAnnouncement() {
+    if (startupAnnouncementShown || !systemAnnouncement || !String(systemAnnouncement.message || '').trim()) return;
+    startupAnnouncementShown = true;
+    void palaceAlert(systemAnnouncement.message, {title:systemAnnouncement.title || '系統公告'});
+}
+async function openSystemAnnouncement() {
+    if (!isCurrentUserAdmin) return;
+    const button = document.getElementById('btn-system-announcement');
+    if (button.disabled) return;
+    button.disabled = true;
+    button.textContent = '公告讀取中…';
+    try {
+        const resp = await fetch(GOOGLE_GAS_API_URL+'?action=get_announcement', {method:'GET',redirect:'follow'});
+        const result = await resp.json();
+        if (result.status !== 'success') throw new Error(result.message || '公告讀取失敗');
+        if (!isCurrentUserAdmin) return;
+        systemAnnouncement = result.data || null;
+        void palaceAlert(systemAnnouncement && systemAnnouncement.message ? systemAnnouncement.message : '目前沒有系統公告。',
+            {title:systemAnnouncement && systemAnnouncement.title || '系統公告'});
+    } catch (error) {
+        if (isCurrentUserAdmin) void palaceAlert('無法讀取系統公告：'+error.message, {title:'系統公告'});
+    } finally {
+        button.disabled = false;
+        button.textContent = '系統公告';
     }
 }
 
