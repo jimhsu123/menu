@@ -1,0 +1,2012 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- 安全防護：CSP 政策 (相容 GIS 與 Google 相關資源) -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' 'unsafe-inline' https://accounts.google.com https://apis.google.com;
+  style-src 'self' 'unsafe-inline' https://accounts.google.com https://fonts.googleapis.com;
+  font-src 'self' https://fonts.gstatic.com;
+  img-src 'self' data: https://lh3.googleusercontent.com https://ui-avatars.com;
+  connect-src 'self' https://script.google.com https://script.googleusercontent.com https://oauth2.googleapis.com;
+  frame-src https://accounts.google.com;
+">
+<title>午餐團｜多人點餐</title>
+<!-- 引入 Google Identity Services (GIS) SDK -->
+<script src="https://accounts.google.com/gsi/client" async defer onload="initGoogleSignIn()"></script>
+<style>
+:root {
+  --bg-dark: #121418;--card-bg: #1c1f26;--border-color: #2e3440;--accent-orange: #f97316;
+  --accent-red: #ef4444;--accent-yellow: #eab308;--accent-green: #10b981;--accent-blue: #3b82f6;
+  --text-main: #f3f4f6;--text-muted: #9ca3af;--row-even: #1e222a;--row-hover: #2a303c;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  padding: 12px;
+  line-height: 1.5;
+}
+.container { max-width: 1400px; margin: 0 auto; }
+.submit-panel {
+  background: linear-gradient(135deg, #1e2638, #182030);
+  border: 1px solid var(--accent-blue);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+.submit-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.submit-badge {
+  font-size: 0.85rem;
+  background-color: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+.select-store {
+  background-color: #272c36;
+  border: 1px solid #4b5563;
+  color: white;
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+}
+#google-login-container { display: flex; align-items: center; gap: 10px; }
+#user-info { display: none; align-items: center; gap: 8px; font-size: 0.9rem; }
+#user-avatar { width: 30px; height: 30px; border-radius: 50%; border: 1px solid #3b82f6; }
+.btn-submit-main {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  font-size: 0.95rem;
+  font-weight: bold;
+  padding: 8px 18px;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-submit-main:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+  transform: translateY(-1px);
+}
+.btn-submit-main:disabled { background: #4b5563; cursor: not-allowed; box-shadow: none; opacity: 0.6; }
+.sync-status-indicator { font-size: 0.82rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px; }
+.status-dot { width: 10px; height: 10px; border-radius: 50%; background-color: var(--accent-green); flex-shrink: 0; }
+.status-dot.syncing { background-color: var(--accent-yellow); animation: pulse 1s infinite; }
+.status-dot.offline { background-color: var(--accent-red); }
+@keyframes pulse { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
+header {
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px;
+  padding-bottom: 12px; border-bottom: 1px solid var(--border-color); margin-bottom: 14px;
+}
+.brand-title { display: flex; align-items: center; gap: 10px; }
+.brand-badge {
+  background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));
+  color: white; font-weight: 800; padding: 5px 12px; border-radius: 8px; font-size: 1.2rem;
+}
+.brand-subtitle { color: var(--text-muted); font-size: 0.82rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.stats-bar { display: flex; gap: 10px; flex-wrap: wrap; }
+.stat-card { background-color: var(--card-bg); border: 1px solid var(--border-color); padding: 6px 14px; border-radius: 8px; text-align: right; }
+.stat-label { font-size: 0.72rem; color: var(--text-muted); }
+.stat-value { font-size: 1.15rem; font-weight: bold; color: var(--accent-yellow); }
+.toolbar {
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px;
+  margin-bottom: 14px; background: var(--card-bg); padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-color);
+}
+.action-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+button { cursor: pointer; border: none; border-radius: 6px; padding: 7px 12px; font-size: 0.85rem; font-weight: 600; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 5px; }
+.btn-primary { background-color: var(--accent-orange); color: white; }
+.btn-primary:hover { background-color: #ea580c; }
+.btn-secondary { background-color: #374151; color: #e5e7eb; }
+.btn-secondary:hover { background-color: #4b5563; }
+.btn-success { background-color: var(--accent-green); color: white; }
+.btn-danger { background-color: var(--accent-red); color: white; }
+.btn-danger:hover { background-color: #dc2626; }
+.btn-danger-outline { background-color: transparent; border: 1px solid var(--accent-red); color: #f87171; }
+.btn-danger-outline:hover { background-color: var(--accent-red); color: white; }
+button:disabled { background: #4b5563 !important; cursor: not-allowed; box-shadow: none; opacity: 0.6; }
+.table-container { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border-color); background-color: var(--card-bg); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4); max-height: 65vh; position: relative; }
+table { width: 100%; border-collapse: collapse; text-align: center; font-size: 0.9rem; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
+thead th { position: sticky; top: 0; background-color: #232833; z-index: 10; color: #e5e7eb; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+.sticky-col-1 { position: sticky; left: 0; background-color: #1c1f26; z-index: 5; text-align: left; min-width: 105px; }
+.sticky-col-2 { position: sticky; left: 105px; background-color: #1c1f26; z-index: 5; text-align: left; min-width: 145px; font-weight: 600; }
+.sticky-col-3 { position: sticky; left: 250px; background-color: #1c1f26; z-index: 5; min-width: 60px; color: var(--accent-yellow); border-right: 2px solid var(--border-color); }
+thead th.sticky-col-1, thead th.sticky-col-2, thead th.sticky-col-3 { z-index: 15; background-color: #232833; }
+tbody tr:nth-child(even) { background-color: var(--row-even); }
+tbody tr:nth-child(even) .sticky-col-1, tbody tr:nth-child(even) .sticky-col-2, tbody tr:nth-child(even) .sticky-col-3 { background-color: var(--row-even); }
+tbody tr:hover { background-color: var(--row-hover); }
+tbody tr:hover .sticky-col-1, tbody tr:hover .sticky-col-2, tbody tr:hover .sticky-col-3 { background-color: var(--row-hover); }
+.current-user-col { background-color: rgba(59, 130, 246, 0.12) !important; border-left: 2px solid var(--accent-blue); border-right: 2px solid var(--accent-blue); }
+thead th.current-user-col { background-color: #1e2e4a !important; color: #93c5fd; }
+.readonly-col { color: var(--text-muted); min-width: 65px; }
+.readonly-val { display: inline-block; font-weight: 600; color: #d1d5db; }
+.readonly-val.has-qty { color: #60a5fa; font-weight: 700; }
+.readonly-val.zero { color: #4b5563; }
+.qty-control { display: inline-flex; align-items: center; background-color: #272c36; border-radius: 6px; border: 1px solid #3b82f6; }
+.qty-btn { background: transparent; border: none; color: #93c5fd; padding: 3px 8px; cursor: pointer; font-size: 0.95rem; font-weight: bold; }
+.qty-btn:hover { background-color: #3b82f6; color: white; }
+.qty-input { width: 34px; text-align: center; background: transparent; border: none; color: white; font-weight: 700; outline: none; }
+.qty-control[disabled] { border-color: #4b5563; }
+.qty-control[disabled] .qty-btn { cursor: not-allowed; color: #4b5563; }
+.qty-control[disabled] .qty-btn:hover { background: transparent; }
+.qty-control[disabled] .qty-input { color: #6b7280; }
+tfoot tr { position: sticky; bottom: 0; background-color: #171a21; font-weight: bold; z-index: 10; }
+tfoot td.sticky-col-1, tfoot td.sticky-col-2, tfoot td.sticky-col-3 { background-color: #171a21; z-index: 11; }
+.badge-category { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; background-color: #312e71; color: #e0e7ff; }
+.col-summary-qty { background-color: rgba(249, 115, 22, 0.1); color: var(--accent-orange); font-weight: bold; }
+.col-summary-amount { background-color: rgba(234, 179, 8, 0.1); color: var(--accent-yellow); font-weight: bold; }
+.banner-notice {
+  background-color: #2d1f14;
+  border: 1px solid var(--accent-orange);
+  color: #fdba74;
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.88rem;
+}
+.locked-banner {
+  background-color: #5a1d1d;
+  border: 1px solid var(--accent-red);
+  color: #fca5a5;
+  text-align: center;
+  font-weight: bold;
+}
+.admin-panel {
+  background-color: #1f2937;
+  border: 1px solid var(--accent-yellow);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  display: none;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.admin-panel-title { color: var(--accent-yellow); font-weight: bold; font-size: 0.9rem; margin-right: 10px;}
+
+@media (max-width: 768px) {
+  .col-category, th.col-category, td.col-category { display: none !important; }
+  .sticky-col-2 { left: 0 !important; min-width: 120px !important; }
+  .sticky-col-3 { left: 120px !important; min-width: 55px !important; }
+  .brand-title h2 { font-size: 1.1rem; }
+  .brand-badge { font-size: 1rem; padding: 3px 8px; }
+  .submit-panel { padding: 10px; }
+  .toolbar { padding: 8px; }
+}
+.modal-overlay { 
+  display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; 
+  background: rgba(0, 0, 0, 0.75); z-index: 100; justify-content: center; align-items: center; padding: 16px; 
+}
+.modal-content { 
+  background-color: var(--card-bg); border: 1px solid var(--border-color); width: 100%; max-width: 600px; 
+  max-height: 85vh; border-radius: 12px; display: flex; flex-direction: column; 
+}
+.modal-header { padding: 12px 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+.modal-body { padding: 16px; overflow-y: auto; }
+.modal-footer { padding: 12px 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px; }
+textarea.summary-text { width: 100%; height: 260px; background-color: #121418; border: 1px solid var(--border-color); color: #e5e7eb; padding: 10px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; }
+.order-item-chip { display: flex; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid #2e3440; }
+.order-note-field { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.order-note-field label { font-size: 1rem; font-weight: 700; color: #fed7aa; }
+.order-note-field input { flex: 1; min-width: 300px; padding: 10px 12px; border: 1px solid #fb923c; border-radius: 6px; background: #121418; color: #f9fafb; font-size: 1rem; }
+.order-note-field input::placeholder { color: #b9bec8; opacity: 1; }
+.order-note-field input:focus-visible { outline: 2px solid #fed7aa; outline-offset: 2px; }
+.order-note-field input:disabled { opacity: 0.6; }
+.order-note-list { margin: 10px 0; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--card-bg); }
+.order-note-list div { margin-top: 5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* 水平凍結至單價左側；表頭仍各自垂直置頂。 */
+#btn-last-order { color: #fed7aa; border: 1px solid #fb923c; background-color: transparent; }
+#btn-last-order:hover { background-color: rgba(251, 146, 60, 0.12); }
+#matrix-table .sticky-col-3 { position: static; left: auto !important; }
+#matrix-table thead th.sticky-col-3 { position: sticky; top: 0; z-index: 10; }
+#matrix-table .frozen-left { position: sticky; left: var(--frozen-left) !important; z-index: 5; background-color: #1c1f26; }
+#matrix-table tbody tr:nth-child(even) .frozen-left { background-color: var(--row-even); }
+#matrix-table tbody tr:hover .frozen-left { background-color: var(--row-hover); }
+#matrix-table thead th.frozen-left { top: 0; z-index: 15; background-color: #232833; }
+#matrix-table tfoot td.frozen-left { z-index: 11; background-color: #171a21; }
+#matrix-table .frozen-edge { border-right: 2px solid var(--border-color); }
+/* 統計表頭使用不透明底色，避免捲動中的數字透出。 */
+#matrix-table thead th.col-summary-qty,
+#matrix-table thead th.col-summary-amount { position: sticky; top: 0; z-index: 12; }
+#matrix-table thead th.col-summary-qty { background-color: #382a20; }
+#matrix-table thead th.col-summary-amount { background-color: #37301f; }
+
+/* 宮廷華麗主題：保留原有點餐行為 */
+:root {
+ --bg-dark:#f5efe3; --card-bg:#fffaf0; --border-color:#d9c59e;
+ --accent-orange:#986b28; --accent-red:#8c2938; --accent-yellow:#986c27;
+ --accent-green:#466a50; --accent-blue:#986c27; --text-main:#382723;
+ --text-muted:#806e5c; --row-even:#f8f0e0; --row-hover:#efe1c5;
+}
+body {
+ padding:30px 24px 48px;
+ font-family:"Microsoft JhengHei","PingFang TC",sans-serif;
+ background:radial-gradient(ellipse at 50% 0, #fffaf0 0, transparent 65%),repeating-linear-gradient(45deg,transparent 0 23px,rgba(146,108,51,.035) 23px 24px),#f3ebdb;
+ color:var(--text-main);
+}
+.container {max-width:1400px;}
+.palace-hero {
+ position:relative; overflow:hidden; text-align:center; padding:30px 24px 34px;
+ margin-bottom:24px; color:#f4e5bc; border:1px solid #b58b48;
+ background:radial-gradient(ellipse at 50% -40%,#a45355 0,transparent 70%),linear-gradient(115deg,#4b1524,#762638 52%,#471421);
+ box-shadow:0 12px 35px #44201720,inset 0 0 0 6px #571c2d,inset 0 0 0 7px #b18a4b;
+}
+.palace-hero:before,.palace-hero:after {content:"";position:absolute;top:24px;bottom:24px;width:76px;border:1px solid #cda55c55;transform:rotate(45deg);pointer-events:none;}
+.palace-hero:before{left:-40px;} .palace-hero:after{right:-40px;}
+.palace-crest {width:66px;height:48px;display:block;margin:0 auto 13px;color:#e4c681;}
+.palace-kicker {font-size:10px;letter-spacing:.38em;color:#d6b879;}
+.palace-hero h1 {font-family:"PMingLiU","Noto Serif TC","Songti TC",serif;font-size:clamp(30px,4vw,46px);font-weight:600;letter-spacing:.22em;margin:9px 0 8px;padding-left:.22em;line-height:1.4;}
+.palace-description {font-size:13px;letter-spacing:.16em;color:#ead8ba;}
+.palace-divider {display:flex;align-items:center;justify-content:center;gap:14px;margin:17px auto 0;color:#d6b879;font-size:15px;}
+.palace-divider:before,.palace-divider:after{content:"";height:1px;width:100px;background:linear-gradient(90deg,transparent,#d6b879);}
+.palace-divider:after{transform:rotate(180deg);}
+.banner-notice {background:#fbf3e1;border:1px solid #d6bb85;border-left:3px solid #a37936;color:#725b38;border-radius:3px;padding:12px 16px;font-size:13px;gap:12px;}
+.locked-banner {background:#f6e8e8;border-color:#bd7d85;color:#842b39;}
+.submit-panel {background:#fffbf3;border:1px solid #ceb88d;border-top:3px solid #a78040;border-radius:5px;padding:20px 22px;margin-bottom:24px;box-shadow:0 5px 20px #5e3c1810;gap:16px;}
+.submit-left {gap:12px;}
+.submit-badge {background:transparent;color:#73512a;padding:0;font-size:12px;letter-spacing:.08em;}
+.select-store {background:#fffaf0;border:1px solid #c7af80;color:#49352a;border-radius:3px;padding:9px 12px;font-size:14px;min-height:38px;}
+.select-store:disabled{opacity:.65;cursor:not-allowed;}
+#user-avatar{border:1px solid #ac843f;}
+button {border-radius:3px;padding:9px 14px;min-height:38px;font-size:13px;letter-spacing:.025em;transition:background .2s,box-shadow .2s,transform .2s;}
+button:hover{box-shadow:0 3px 10px #704a2420;}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible {outline:2px solid #986b28;outline-offset:3px;}
+.btn-primary,.btn-submit-main {background:linear-gradient(135deg,#8e3546,#641d2e);color:#fff5dd;border:1px solid #8d4750;box-shadow:0 3px 8px #71243620;}
+.btn-primary:hover,.btn-submit-main:hover {background:linear-gradient(135deg,#a44355,#762638);}
+.btn-submit-main{font-size:14px;padding:10px 18px;border-radius:3px;}
+.btn-secondary {background:#f6ecda;border:1px solid #d4bc8e;color:#6b512e;}
+.btn-secondary:hover {background:#ecddbd;}
+.btn-success {background:#48664d;border:1px solid #48664d;color:#fff8e9;}
+.btn-success:hover {background:#36543d;}
+.btn-danger{background:#8b2e3d;color:#fff6e5;} .btn-danger:hover{background:#722333;}
+.btn-danger-outline {border-color:#bd7e85;color:#8c3342;background:#fff8f2;}
+.btn-danger-outline:hover {background:#8c3342;color:#fff8e9;}
+button:disabled,.btn-submit-main:disabled{background:#e5dbc8!important;color:#887b68;opacity:1;border:1px solid #d8cbb2;box-shadow:none;}
+.sync-status-indicator {font-size:12px;color:#7c6b54;} .status-dot{width:7px;height:7px;}
+.submit-panel {margin-bottom:14px;}
+header {padding:3px 0 12px;margin-bottom:12px;border-bottom:1px solid #cbb485;gap:20px;}
+.brand-title {gap:15px;}
+.brand-badge {background:#6c2333;color:#f2dba7;border:1px solid #b58e4e;border-radius:3px;font-family:"PMingLiU",serif;box-shadow:inset 0 0 0 3px #6c2333,inset 0 0 0 4px #b58e4e;padding:12px 16px;font-size:18px;}
+.brand-title h2 {font-family:"PMingLiU","Noto Serif TC",serif;font-size:25px;font-weight:600;letter-spacing:.05em;color:#612535;}
+.brand-subtitle {font-size:12px;margin-top:6px;color:#8b765a;letter-spacing:.06em;}
+.stats-bar{gap:12px;}
+.stat-card {background:#fffbf2;border:1px solid #d5c19b;border-radius:3px;padding:9px 20px;min-width:118px;position:relative;}
+.stat-card:before {content:"";position:absolute;top:0;left:15px;right:15px;height:2px;background:#b69250;}
+.stat-label {font-size:11px;letter-spacing:.07em;margin-bottom:4px;}
+.stat-value {font-family:Georgia,"Microsoft JhengHei",serif;font-size:23px;color:#7b2939;font-variant-numeric:tabular-nums;}
+.toolbar {background:transparent;border:0;border-radius:0;padding:0;margin-bottom:16px;gap:12px;}
+.action-controls {gap:10px;}
+#btn-last-order {color:#8d672d;border-color:#bd9b5c;background:#fff9ed;}
+#btn-last-order:hover{background:#efdfbc;}
+.order-note-field {gap:8px;}
+.order-note-field label {color:#785932;font-size:13px;}
+.order-note-field input {background:#fffdf8;border-color:#d3bd93;color:#382723;min-width:240px;font-size:13px;padding:10px 12px;border-radius:3px;}
+.order-note-field input::placeholder {color:#93846c;}
+.order-note-field input:focus-visible{outline-color:#ac843f;}
+.table-container {border:1px solid #c9ae78;border-top:3px solid #9e7739;border-radius:4px;background:#fffbf3;box-shadow:0 6px 24px #583a1e12;max-height:65vh;}
+#matrix-table {font-size:14px;}
+th,td {padding:13px 16px;border-bottom-color:#e2d5bc;}
+#matrix-table thead th {background:#662434;color:#f7e7bc;font-size:12px;font-weight:600;letter-spacing:.035em;border-bottom:1px solid #b99456;box-shadow:none;}
+#matrix-table .sticky-col-1,#matrix-table .sticky-col-2,#matrix-table .sticky-col-3,#matrix-table .frozen-left {background-color:#fffbf3;}
+#matrix-table thead th.frozen-left,#matrix-table thead th.sticky-col-3 {background-color:#662434;}
+#matrix-table thead th.col-summary-qty {background:#773243;color:#fae6b8;}
+#matrix-table thead th.col-summary-amount {background:#583322;color:#f4d694;}
+#matrix-table tfoot tr,#matrix-table tfoot td,#matrix-table tfoot td.frozen-left,#matrix-table tfoot td.sticky-col-3 {background:#eadbbc;color:#634621;border-top:2px solid #b79760;}
+.badge-category {background:#f0e4cc;border:1px solid #d8c19a;color:#7b5a2e;padding:3px 8px;border-radius:2px;font-size:11px;}
+.col-summary-qty {background:#a1762710;color:#8a6228;}
+.col-summary-amount {background:#8b29380a;color:#7b2939;}
+#matrix-table .current-user-col{background:#e8d7b044!important;border-left-color:#b08a46;border-right-color:#b08a46;}
+#matrix-table thead th.current-user-col{background:#8c6a32!important;color:#fff5da;}
+.readonly-val {color:#725d43;} .readonly-val.has-qty{color:#873246;} .readonly-val.zero{color:#ada08b;}
+.qty-control {background:#fffaf0;border-color:#ba9556;border-radius:3px;}
+.qty-btn {color:#7f5928;padding:3px 9px;min-height:30px;}
+.qty-btn:hover {background:#a67e3c;color:#fff8e8;}
+.qty-input {color:#573523;}
+.qty-control[disabled]{border-color:#cfbea0;}
+.qty-control[disabled] .qty-btn,.qty-control[disabled] .qty-input{color:#9b8b73;}
+.admin-panel {background:#f5ead1;border-color:#b69250;border-radius:3px;}
+.modal-overlay {background:#29151bcc;backdrop-filter:blur(4px);}
+.modal-content {background:#fffaf0;border:1px solid #b39050;border-top:4px solid #782a3b;border-radius:5px;box-shadow:0 20px 70px #16071066;}
+.modal-header {color:#732a39;padding:18px 22px;font-family:"PMingLiU",serif;}
+.modal-body {padding:22px;}
+.modal-footer {padding:16px 22px;background:#f5ebd8;}
+textarea.summary-text {background:#fffdf8;color:#493426;border-color:#d1b989;border-radius:3px;line-height:1.8;}
+.order-item-chip{border-bottom-color:#dfcfb1;padding:12px 0;}
+#admin-order-items .order-item-chip {align-items:center;gap:12px;padding:10px 12px;border-left:3px solid transparent;}
+#admin-order-items .admin-order-selected {background:#f0dfb8;border-left-color:#a67e3c;}
+#admin-order-items .order-item-chip > span {flex:1;min-width:0;overflow-wrap:anywhere;}
+#admin-order-items .qty-control {flex-shrink:0;}
+/* 全頁字型統一採用菜單表頭的字型，保留各區塊原有字級與字重。 */
+:root {--menu-font:"Microsoft JhengHei","PingFang TC",sans-serif;}
+body, button, input, select, textarea.summary-text,
+.palace-hero h1, .brand-badge, .brand-title h2, .stat-value,
+.modal-header, #matrix-table thead th {font-family:var(--menu-font);}
+.order-note-list {background:#fffbf2;border-radius:3px;border-color:#d5bd91;}
+.palace-footer {text-align:center;color:#9b815c;font-size:11px;letter-spacing:.16em;padding:22px 0 0;}
+@media(max-width:768px){
+ body{padding:14px 12px 30px;} .palace-hero{padding:24px 15px;margin-bottom:18px;}
+ .palace-description{font-size:11px;letter-spacing:.07em;} .palace-kicker{font-size:9px;letter-spacing:.23em;}
+ .submit-panel{padding:15px 12px;} .submit-left{width:100%;gap:10px;}
+ .order-note-field{width:100%;} .order-note-field input{min-width:0;width:100%;}
+ header{gap:17px;} .brand-title h2{font-size:19px;} .brand-badge{font-size:16px;padding:10px 12px;}
+ .stats-bar{width:100%;gap:8px;} .stat-card{flex:1;min-width:0;padding:10px 9px;}
+ .stat-value{font-size:19px;} .stat-label{font-size:10px;}
+ .banner-notice{align-items:flex-start;flex-wrap:wrap;padding:12px;font-size:12px;}
+ .toolbar{padding:0;} .action-controls{gap:8px;} .action-controls button{font-size:12px;padding:8px 10px;}
+ th,td{padding:11px 12px;} .table-container{max-height:60vh;}
+}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;}}
+
+
+/* 與宮廷菜單一致的確認、通知與輸入視窗。 */
+.palace-dialog {position:fixed;inset:0;margin:auto;padding:0;width:calc(100% - 32px);max-width:480px;max-height:calc(100dvh - 32px);overflow:auto;color:var(--text-main);background:#fffaf0;border:1px solid #b39050;border-radius:6px;box-shadow:0 24px 80px #16071066;font-family:var(--menu-font);}
+.palace-dialog::backdrop {background:#29151bb3;backdrop-filter:blur(4px);}
+.palace-dialog [hidden] {display:none!important;}
+.palace-dialog-top {position:relative;height:44px;color:#f4e5bc;background:radial-gradient(ellipse at 50% -40%,#a45355 0,transparent 70%),linear-gradient(115deg,#4b1524,#762638 52%,#471421);border-bottom:1px solid #b58b48;}
+.palace-dialog h2 {position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0;}
+.palace-dialog-close {position:absolute;top:6px;right:10px;padding:0;width:32px;min-height:32px;justify-content:center;border:1px solid #d6b87955;background:transparent;color:#ead8ba;font-size:21px;border-radius:3px;}
+.palace-dialog-close:hover {background:#ffffff12;}
+.palace-dialog-body {padding:18px 28px;}
+.palace-dialog-message {white-space:pre-wrap;overflow-wrap:anywhere;color:#5d4637;font-size:15px;line-height:1.9;}
+.palace-dialog-field {margin-top:18px;}
+.palace-dialog-field[hidden] {display:none;}
+.palace-dialog-field label {display:block;margin-bottom:7px;font-size:13px;font-weight:600;color:#785932;}
+.palace-dialog-field input {display:block;width:100%;padding:11px 12px;border:1px solid #c7af80;border-radius:3px;background:#fffdf8;color:#382723;font:inherit;font-size:15px;}
+.palace-dialog-actions {display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;padding:5px 10px 5px 28px;background:#f5ebd8;border-top:1px solid #dfcfb1;}
+.palace-dialog-actions button {min-width:104px;justify-content:center;min-height:38px;}
+@media(max-width:480px){.palace-dialog-body{padding:16px 20px;}.palace-dialog-actions{padding:5px 10px 5px 20px;}.palace-dialog-actions button{flex:1;min-width:0;}}
+
+</style>
+</head>
+<body>
+<div class="container" id="main-container">
+
+    <div class="banner-notice" id="login-notice-banner">
+        <span>💡 <strong>瀏覽模式中</strong>：切換上方店家可瀏覽菜單。如欲點餐送出，請點擊「Google 登入」或使用「快速訪客模式」。</span>
+        <button class="btn-secondary" onclick="enterGuestMode()">訪客點餐測試</button>
+    </div>
+
+    <div class="banner-notice locked-banner" id="locked-notice-banner" style="display: none;">
+        <span>🔒 此店家已結單。已被管理員鎖定，無法再進行點餐或修改。</span>
+    </div>
+
+    <div class="submit-panel">
+        <div class="submit-left">
+            <span class="submit-badge">選擇店家</span>
+            <select id="store-select" class="select-store" onchange="switchStore()"></select>
+
+            <div id="google-login-container">
+                <div id="g_id_signin"></div>
+                <button id="btn-manual-login" class="btn-primary" style="display:none;" onclick="triggerGoogleSignIn()">🔑 重新授權 / 登入</button>
+                <div id="user-info">
+                    <img id="user-avatar" src="" alt="avatar">
+                    <span id="user-name-display"></span>
+                    <button class="btn-secondary" onclick="logout()">登出</button>
+                </div>
+            </div>
+
+            <button class="btn-submit-main" id="btn-submit-order" onclick="submitMyOrderToCloud()" disabled>送出我的點餐</button>
+            <div class="order-note-field"><label for="order-note-input">📝 訂單備註</label><input id="order-note-input" type="text" maxlength="200" placeholder="例如：不要香菜（最多 200 字）" disabled></div>
+            <button class="btn-secondary" onclick="fetchFromGoogleDrive(true)">重新整理</button>
+        </div>
+        <div class="sync-status-indicator">
+            <span class="status-dot" id="status-dot"></span>
+            <span id="sync-status-text">菜單就緒</span>
+        </div>
+    </div>
+
+    <div id="wallet-panel" class="submit-panel" style="display:none">
+      <strong id="wallet-balance">儲值餘額載入中</strong>
+      <span>各店共用・餘額足夠才可全額扣抵</span>
+      <button class="btn-secondary" onclick="openWalletHistory()">儲值／扣抵紀錄</button>
+      <button class="btn-secondary" onclick="refreshWallet(true).catch(e=>palaceAlert(e.message))">更新餘額</button>
+    </div>
+    <!-- Admin Panel (管理員面板) -->
+    <div class="admin-panel" id="admin-controls-panel">
+        <span class="admin-panel-title">⭐ 管理員面板</span>
+        <button class="btn-secondary" onclick="openAdminWallets()">Google 帳號儲值管理</button>
+        <button class="btn-secondary" onclick="openAdminOrders()">修改／刪除使用者訂單</button>
+        <button class="btn-danger" id="btn-admin-lock" onclick="adminLockMenu()">🔒 結單 (鎖定菜單)</button>
+        <button class="btn-success" id="btn-admin-unlock" onclick="adminUnlockMenu()" style="display: none;">🔓 解鎖菜單</button>
+        <button class="btn-danger-outline" onclick="adminClearAllOrders()">🔄 重啟訂單</button>
+    </div>
+
+    <header>
+        <div class="brand-title">
+            <div class="brand-badge" id="store-brand-badge">點餐</div>
+            <div>
+                <h2 id="store-title">多店家點餐與費用統計矩陣</h2>
+                <div class="brand-subtitle" id="store-message" hidden></div>
+            </div>
+        </div>
+        <div class="stats-bar">
+            <div class="stat-card"><div class="stat-label">全單總金額</div><div class="stat-value" id="grand-total-amount">NT$ 0</div></div>
+            <div class="stat-card"><div class="stat-label">已點總數量</div><div class="stat-value" id="grand-total-qty">0 份</div></div>
+            <div class="stat-card"><div class="stat-label">用餐人數</div><div class="stat-value" id="total-members-count">0 人</div></div>
+        </div>
+    </header>
+
+    <div class="toolbar">
+        <div class="action-controls">
+            <button class="btn-secondary" id="btn-last-order" style="display:none" onclick="loadLastOrder()">上次訂單</button>
+            <button class="btn-danger-outline" id="btn-clear-my-order" onclick="clearMyOrder()">清空我的數量</button>
+            <button class="btn-secondary" onclick="openKitchenModal()">店家劃單彙整</button>
+            <button class="btn-success" onclick="openShareModal()">複製 LINE 明細</button>
+        </div>
+    </div>
+
+    <div class="order-note-list" id="order-note-list" style="display:none;"></div>
+
+    <div class="table-container">
+        <table id="matrix-table">
+            <thead>
+                <tr id="table-header-row">
+                    <th class="sticky-col-1 col-category">分類</th>
+                    <th class="sticky-col-2">品項名稱</th>
+                    <th class="sticky-col-3">單價</th>
+                    <th class="col-summary-qty">店家劃單總量</th>
+                    <th class="col-summary-amount">品項小計</th>
+                </tr>
+            </thead>
+            <tbody id="matrix-tbody"></tbody>
+            <tfoot>
+                <tr id="table-foot-row">
+                    <td class="sticky-col-1 col-category">統計</td>
+                    <td class="sticky-col-2">個人應付總計</td>
+                    <td class="sticky-col-3">-</td>
+                    <td id="foot-total-qty" class="col-summary-qty">0</td>
+                    <td id="foot-total-amount" class="col-summary-amount">NT$ 0</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
+<div class="palace-footer">❖ &nbsp; IT · 內部用 &nbsp; ❖</div>
+<!-- 店家劃單彈窗 -->
+<div class="modal-overlay" id="kitchen-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>店家劃單彙整清單 (僅顯示有數量品項)</h3>
+            <button class="btn-secondary" onclick="closeModal('kitchen-modal')">×</button>
+        </div>
+        <div class="modal-body" id="kitchen-list-body"></div>
+        <div class="modal-footer">
+            <button class="btn-primary" onclick="closeModal('kitchen-modal')">關閉</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="admin-orders-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>修改／刪除使用者訂單</h3>
+            <button class="btn-secondary" onclick="closeModal('admin-orders-modal')">×</button>
+        </div>
+        <div class="modal-body">
+            <label for="admin-member-select">訂購人</label>
+            <select id="admin-member-select" class="select-store" onchange="renderAdminOrderEditor()"></select>
+            <p id="admin-order-message"></p>
+            <div id="admin-order-items"></div>
+            <label for="admin-order-note">訂單備註</label>
+            <textarea id="admin-order-note" class="summary-text" maxlength="200" style="height:80px;min-height:80px"></textarea>
+            <p id="admin-order-total"></p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-primary" id="btn-admin-save-member" onclick="saveAdminMemberOrder()">儲存修改</button>
+            <button class="btn-danger" id="btn-admin-delete-member" onclick="deleteAdminMemberOrder()">刪除此人訂單</button>
+            <button class="btn-secondary" onclick="closeModal('admin-orders-modal')">關閉</button>
+        </div>
+    </div>
+</div>
+
+<!-- LINE 分帳明細彈窗 -->
+<div class="modal-overlay" id="share-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>LINE 對帳明細訊息</h3>
+            <button class="btn-secondary" onclick="closeModal('share-modal')">×</button>
+        </div>
+        <div class="modal-body">
+            <textarea id="share-text-area" class="summary-text" readonly></textarea>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-success" onclick="copyShareText()">複製到剪貼簿</button>
+            <button class="btn-secondary" onclick="closeModal('share-modal')">關閉</button>
+        </div>
+    </div>
+</div>
+
+
+<!-- 原生 dialog 提供焦點限制與背景隔離，文字以 textContent 安全填入。 -->
+<dialog id="palace-dialog" class="palace-dialog" aria-labelledby="palace-dialog-title" aria-describedby="palace-dialog-message">
+  <div class="palace-dialog-top">
+    <h2 id="palace-dialog-title">操作確認</h2>
+    <button type="button" id="palace-dialog-close" class="palace-dialog-close" aria-label="關閉視窗">×</button>
+  </div>
+  <div class="palace-dialog-body">
+    <p id="palace-dialog-message" class="palace-dialog-message"></p>
+    <div id="palace-dialog-field" class="palace-dialog-field" hidden>
+      <label id="palace-dialog-label" for="palace-dialog-input">請輸入</label>
+      <input id="palace-dialog-input" type="text" autocomplete="off">
+    </div>
+  </div>
+  <div class="palace-dialog-actions">
+    <button type="button" id="palace-dialog-cancel" class="btn-secondary">取消</button>
+    <button type="button" id="palace-dialog-accept" class="btn-primary">確定</button>
+  </div>
+</dialog>
+
+<div class="modal-overlay" id="wallet-history-modal" style="z-index:1100;display:none">
+ <div class="modal-content" style="width:min(900px,95vw)">
+  <div class="modal-header"><strong>儲值與訂單扣抵紀錄</strong><button class="btn-secondary" onclick="closeModal('wallet-history-modal')">關閉</button></div>
+  <div style="padding:20px;max-height:70vh;overflow:auto" id="wallet-history-body"></div>
+ </div>
+</div>
+<div class="modal-overlay" id="admin-wallet-modal" style="display:none">
+ <div class="modal-content" style="width:min(800px,95vw)">
+  <div class="modal-header"><strong>Google 帳號儲值管理</strong><button class="btn-secondary" onclick="closeModal('admin-wallet-modal')">關閉</button></div>
+  <div style="padding:20px;max-height:70vh;overflow:auto">
+   <p>輸入公司 Google Email。正數為新增儲值，負數為扣減調整；每筆均保留原因與操作人。</p>
+   <label for="wallet-email">Google Email</label><input id="wallet-email" type="email" class="select-store" placeholder="name@infotimes.com.tw" style="width:100%;box-sizing:border-box">
+   <label for="wallet-amount">異動金額（NT$，最多兩位小數）</label><input id="wallet-amount" type="number" step="0.01" class="select-store" style="width:100%;box-sizing:border-box">
+   <label for="wallet-reason">原因／備註</label><input id="wallet-reason" maxlength="200" class="select-store" style="width:100%;box-sizing:border-box">
+   <p><button id="wallet-adjust-button" class="btn-primary" onclick="adjustWallet()">確認儲值／調整</button>
+   <button class="btn-secondary" onclick="loadAdminWallets().catch(e=>palaceAlert(e.message))">重新整理帳號</button></p>
+   <div id="admin-wallet-list"></div>
+  </div>
+ </div>
+</div>
+<script>
+
+// 每次只顯示一則訊息，避免背景同步提示蓋過使用者的確認。
+const palaceDialogQueue = [];
+let palaceDialogActive = false;
+function showPalaceDialog(message, options = {}) {
+    return new Promise(resolve => {
+        palaceDialogQueue.push({message, options, resolve});
+        displayNextPalaceDialog();
+    });
+}
+function displayNextPalaceDialog() {
+    if (palaceDialogActive || !palaceDialogQueue.length) return;
+    palaceDialogActive = true;
+    const {message, options, resolve} = palaceDialogQueue.shift();
+    const dialog = document.getElementById('palace-dialog');
+    const input = document.getElementById('palace-dialog-input');
+    const cancel = document.getElementById('palace-dialog-cancel');
+    const accept = document.getElementById('palace-dialog-accept');
+    const previousFocus = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    const kind = options.kind || 'alert';
+    const canceledValue = options.walletChoice ? null : kind === 'prompt' ? null : kind === 'confirm' ? false : undefined;
+    let value = canceledValue;
+    document.getElementById('palace-dialog-title').textContent = options.title || (kind === 'alert' ? '溫馨提醒' : kind === 'prompt' ? '填寫資料' : '操作確認');
+    document.getElementById('palace-dialog-message').textContent = String(message);
+    document.getElementById('palace-dialog-field').hidden = kind !== 'prompt';
+    document.getElementById('palace-dialog-label').textContent = options.label || '請輸入';
+    input.value = options.defaultValue || '';
+    cancel.hidden = kind === 'alert';
+    cancel.textContent = options.cancelText || '取消';
+    accept.textContent = options.confirmText || (kind === 'alert' ? '我知道了' : '確定');
+    const dismiss = () => dialog.close();
+    accept.onclick = () => {
+        value = kind === 'prompt' ? input.value : kind === 'confirm' ? true : undefined;
+        dialog.close();
+    };
+    cancel.onclick = () => { value = kind === 'confirm' ? false : canceledValue; dialog.close(); };
+    document.getElementById('palace-dialog-close').onclick = dismiss;
+    dialog.oncancel = event => { event.preventDefault(); dismiss(); };
+    // 確認視窗預設聚焦取消；Enter 依目前焦點操作，避免意外清空資料。
+    input.onkeydown = event => {
+        if (event.key === 'Enter' && !event.isComposing) {
+            event.preventDefault(); accept.click();
+        }
+    };
+    dialog.onclose = () => {
+        palaceDialogActive = false;
+        document.body.style.overflow = previousOverflow;
+        if (previousFocus && previousFocus.isConnected) previousFocus.focus({preventScroll:true});
+        resolve(value);
+        displayNextPalaceDialog();
+    };
+    document.body.style.overflow = 'hidden';
+    dialog.showModal();
+    if (kind === 'prompt') { input.focus(); input.select(); }
+    else (kind === 'confirm' ? cancel : accept).focus();
+}
+function palaceAlert(message, options = {}) {
+    return showPalaceDialog(message, {...options, kind:'alert'});
+}
+function palaceConfirm(message, options = {}) {
+    return showPalaceDialog(message, {...options, kind:'confirm'});
+}
+function palacePrompt(message, defaultValue = '', options = {}) {
+    return showPalaceDialog(message, {...options, kind:'prompt', defaultValue});
+}
+
+// ===================================================================
+// ======== 公開設定參數 =============================================
+// ===================================================================
+const GOOGLE_GAS_API_URL = "https://script.google.com/macros/s/AKfycbzEJGA2w9YOqs2v1S1EUHggdQrEe6CzI8R-5FluG1v54rKw8Z_RV7obubI4RvUgG6Hp/exec";
+const GOOGLE_CLIENT_ID = "332175692979-nkrni08k8fleg7te2uju417rmc207vlv.apps.googleusercontent.com"; 
+
+// ===============================================
+// ======== 核心狀態與變數 =========================
+// ===============================================
+let ALL_STORES = {};
+let MENU_DATA = [];
+let members = [];
+let orders = {};
+let walletData = null;
+let orderPayments = {};
+let orderNotes = {};
+let currentUser = "";
+let currentUserEmail = "";
+let currentIdToken = "";
+let isGuestModeActive = false;
+let isCurrentUserAdmin = false;
+let currentStoreId = "";
+let isSubmitting = false;
+let isMenuLocked = false;
+let isGsiInitialized = false;
+
+function formatPrice(val) {
+    if (typeof val !== 'number') val = Number(val);
+    if (isNaN(val)) return '0';
+    return val.toLocaleString('zh-TW', { maximumFractionDigits: 2 });
+}
+
+function formatAmount(val) {
+    if (typeof val !== 'number') val = Number(val);
+    if (isNaN(val)) return '0';
+    const rounded = Math.round((val + Number.EPSILON) * 100) / 100;
+    return rounded.toLocaleString('zh-TW', { maximumFractionDigits: 2 });
+}
+
+function normalizeOrderNote(value) {
+    return typeof value === 'string' ? value.trim().slice(0, 200) : '';
+}
+
+function updateOrderNoteInput() {
+    const input = document.getElementById('order-note-input');
+    input.disabled = !currentUser || isMenuLocked;
+    input.value = currentUser ? normalizeOrderNote(orderNotes[currentUser]) : '';
+}
+
+function renderOrderNotes() {
+    const list = document.getElementById('order-note-list');
+    list.replaceChildren();
+    const notedMembers = members.filter(m => normalizeOrderNote(orderNotes[m]));
+    list.style.display = notedMembers.length ? 'block' : 'none';
+    if (!notedMembers.length) return;
+    const title = document.createElement('strong');
+    title.textContent = '訂購人備註';
+    list.appendChild(title);
+    notedMembers.forEach(m => {
+        const line = document.createElement('div');
+        line.textContent = `${m}：${normalizeOrderNote(orderNotes[m])}`;
+        list.appendChild(line);
+    });
+}
+
+function jwt_decode(token) {
+    try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload);
+    } catch (e) {
+        console.error("JWT 解析異常", e);
+        return null;
+    }
+}
+
+/**
+ * 檢查當前 Token 是否依然有效 (預留 60 秒緩衝時間)
+ */
+function isTokenValid(token) {
+    if (!token) return false;
+    const decoded = jwt_decode(token);
+    if (!decoded || !decoded.exp) return false;
+    const nowSec = Math.floor(Date.now() / 1000);
+    return decoded.exp > (nowSec + 60);
+}
+
+window.onload = async function() {
+    updateStatus("syncing", "正在載入店家列表...");
+    try {
+        // 1. 還原先前的登入狀態
+        restoreSessionFromStorage();
+
+        // 2. 載入店家列表
+        await loadStoreList();
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const storeFromUrl = urlParams.get('store');
+
+        currentStoreId = storeFromUrl && ALL_STORES[storeFromUrl] 
+            ? storeFromUrl 
+            : localStorage.getItem("menu_order_current_store") || Object.keys(ALL_STORES)[0];
+
+        if (!currentStoreId) {
+             updateStatus("offline", "找不到任何店家。請確認試算表中有 'MENU' 分頁。");
+             return;
+        }
+
+        init();
+
+    } catch (error) {
+        console.error("初始化失敗:", error);
+        updateStatus("offline", "初始化失敗：" + error.message);
+    }
+};
+
+/**
+ * 恢復 localStorage 登入態
+ */
+function restoreSessionFromStorage() {
+    try {
+        const savedToken = localStorage.getItem("menu_order_id_token");
+        const savedUser = localStorage.getItem("menu_order_current_user");
+        const savedEmail = localStorage.getItem("menu_order_current_email");
+        const savedAvatar = localStorage.getItem("menu_order_current_avatar");
+
+        if (savedToken && savedUser) {
+            if (isTokenValid(savedToken)) {
+                currentIdToken = savedToken;
+                currentUser = savedUser;
+                currentUserEmail = savedEmail || "";
+
+                document.getElementById('g_id_signin').style.display = 'none';
+                document.getElementById('btn-manual-login').style.display = 'none';
+                document.getElementById('user-info').style.display = 'flex';
+                document.getElementById('user-avatar').src = savedAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser)}&background=3b82f6&color=fff`;
+                document.getElementById('user-name-display').innerText = `${currentUser}`;
+                document.getElementById('login-notice-banner').style.display = 'none';
+
+                checkAdminIdentityQuick(currentUserEmail);
+                verifyUserRoleWithBackend(currentIdToken);
+            } else {
+                console.warn("本機 Token 已過期，需重新登入刷新憑證。");
+                // 標記需要刷新，但保留頭像與名稱給予友善提示
+                document.getElementById('btn-manual-login').style.display = 'inline-flex';
+                document.getElementById('btn-manual-login').innerText = "🔑 憑證過期，請點此重新登入";
+            }
+        }
+    } catch (e) {
+        console.warn("還原登入態失敗", e);
+    }
+}
+
+function clearSessionStorage() {
+    localStorage.removeItem("menu_order_id_token");
+    localStorage.removeItem("menu_order_current_user");
+    localStorage.removeItem("menu_order_current_email");
+    localStorage.removeItem("menu_order_current_avatar");
+}
+
+async function loadStoreList() {
+    const resp = await fetch(`${GOOGLE_GAS_API_URL}?action=get_stores`, {
+        method: "GET",
+        redirect: "follow"
+    });
+    const resJson = await resp.json();
+    if (resJson.status === "success") {
+        ALL_STORES = resJson.data;
+    } else {
+        throw new Error(resJson.message || "取得店家列表失敗");
+    }
+}
+
+function init() {
+    renderStoreSelect();
+    loadLocalDataForStore();
+    renderTable(); 
+    calculateAll();
+    updateBrand();
+    updateUserModeUI();
+    renderAdminPanelUI();
+
+    initGoogleSignIn();
+    fetchFromGoogleDrive(false); 
+}
+
+function initGoogleSignIn() {
+    if (isGsiInitialized) return;
+    try {
+        if (window.google && google.accounts && google.accounts.id) {
+            google.accounts.id.initialize({
+                client_id: GOOGLE_CLIENT_ID,
+                callback: handleCredentialResponse,
+                auto_select: false
+            });
+
+            isGsiInitialized = true;
+            const btnContainer = document.getElementById('g_id_signin');
+            if (btnContainer && !currentUser) {
+                google.accounts.id.renderButton(btnContainer, { 
+                    theme: 'outline', 
+                    size: 'medium', 
+                    text: 'signin_with', 
+                    shape: 'pill' 
+                });
+            }
+        } else {
+            showManualLoginOption();
+        }
+    } catch (e) {
+        console.warn("GIS 初始化異常", e);
+        showManualLoginOption();
+    }
+}
+
+function showManualLoginOption() {
+    if (!currentUser) {
+        const manualBtn = document.getElementById('btn-manual-login');
+        if (manualBtn) manualBtn.style.display = 'inline-flex';
+    }
+}
+
+function triggerGoogleSignIn() {
+    if (window.google && google.accounts && google.accounts.id) {
+        google.accounts.id.prompt();
+    } else {
+        enterGuestMode();
+    }
+}
+
+async function handleCredentialResponse(response) {
+    if (isSubmitting) return;
+    currentIdToken = response.credential;
+    isGuestModeActive = false;
+
+    const decodedToken = jwt_decode(currentIdToken);
+    if (!decodedToken) {
+        palaceAlert("Google 憑證解析失敗！");
+        return;
+    }
+
+    currentUser = decodedToken.name || decodedToken.given_name || decodedToken.email.split('@')[0];
+    currentUserEmail = decodedToken.email || "";
+    const avatarUrl = decodedToken.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser)}&background=3b82f6&color=fff`;
+
+    // 儲存至 localStorage
+    localStorage.setItem("menu_order_id_token", currentIdToken);
+    localStorage.setItem("menu_order_current_user", currentUser);
+    localStorage.setItem("menu_order_current_email", currentUserEmail);
+    localStorage.setItem("menu_order_current_avatar", avatarUrl);
+
+    // UI 切換
+    document.getElementById('g_id_signin').style.display = 'none';
+    document.getElementById('btn-manual-login').style.display = 'none';
+    document.getElementById('user-info').style.display = 'flex';
+    document.getElementById('user-avatar').src = avatarUrl;
+    document.getElementById('user-name-display').innerText = `${currentUser}`;
+    document.getElementById('login-notice-banner').style.display = 'none';
+
+    if (!members.includes(currentUser)) {
+        members.push(currentUser);
+        if (!orders[currentUser]) orders[currentUser] = {};
+    }
+
+    // 立即判定管理員並顯示面板
+    checkAdminIdentityQuick(currentUserEmail);
+
+    saveLocal();
+    renderTable();
+    calculateAll();
+    updateUserModeUI();
+    renderAdminPanelUI();
+    updateStatus("online", `已登入：${currentUser}`);
+
+    // 背景向後端同步驗證
+    verifyUserRoleWithBackend(currentIdToken);
+}
+
+function checkAdminIdentityQuick(email) {
+    if (!email) return;
+    const emailLower = email.toLowerCase().trim();
+    if (emailLower.startsWith("jim.hsu@") || emailLower.startsWith("roye.tu@")) {
+        isCurrentUserAdmin = true;
+        renderAdminPanelUI();
+    }
+}
+
+async function verifyUserRoleWithBackend(token) {
+    if (!token) return;
+    resetWalletUI();
+    try {
+        const resp = await fetch(GOOGLE_GAS_API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({ action: "check_user_role", idToken: token }),
+            redirect: "follow"
+        });
+        const res = await resp.json();
+        if (token !== currentIdToken || isGuestModeActive) return;
+        if (res.status !== 'success') throw new Error(res.message);
+        isCurrentUserAdmin = !!res.data.isAdmin;
+        renderAdminPanelUI();
+        await refreshWallet(true);
+    } catch (e) {
+        console.warn("核對角色略過，維持現有標記", e);
+    }
+}
+
+function renderAdminPanelUI() {
+    const adminPanel = document.getElementById('admin-controls-panel');
+    if (isCurrentUserAdmin) {
+        adminPanel.style.display = 'flex';
+        document.getElementById('btn-admin-lock').style.display = isMenuLocked ? 'none' : 'inline-flex';
+        document.getElementById('btn-admin-unlock').style.display = isMenuLocked ? 'inline-flex' : 'none';
+    } else {
+        adminPanel.style.display = 'none';
+    }
+}
+
+async function enterGuestMode() {
+    if (isSubmitting) return;
+    const name = await palacePrompt("請輸入您的點餐暱稱或姓名，以便辨識您的訂單。", "訪客", {title:"訪客點餐", label:"暱稱／姓名", confirmText:"開始點餐"});
+    if (!name || !name.trim()) return;
+
+    currentUser = name.trim();
+    currentUserEmail = "";
+    currentIdToken = "";
+    resetWalletUI();
+    isGuestModeActive = true;
+    isCurrentUserAdmin = false;
+    clearSessionStorage();
+
+    document.getElementById('g_id_signin').style.display = 'none';
+    document.getElementById('btn-manual-login').style.display = 'none';
+    document.getElementById('user-info').style.display = 'flex';
+    document.getElementById('user-avatar').src = "https://ui-avatars.com/api/?name=" + encodeURIComponent(currentUser) + "&background=3b82f6&color=fff";
+    document.getElementById('user-name-display').innerText = `訪客: ${currentUser}`;
+    document.getElementById('login-notice-banner').style.display = 'none';
+    document.getElementById('admin-controls-panel').style.display = 'none';
+
+    if (!members.includes(currentUser)) {
+        members.push(currentUser);
+        if (!orders[currentUser]) orders[currentUser] = {};
+    }
+
+    saveLocal();
+    renderTable();
+    calculateAll();
+    updateUserModeUI();
+}
+
+function logout() {
+    if (isSubmitting) return;
+    closeModal('admin-orders-modal');
+    currentUser = "";
+    currentUserEmail = "";
+    currentIdToken = "";
+    resetWalletUI();
+    isGuestModeActive = false;
+    isCurrentUserAdmin = false;
+
+    clearSessionStorage();
+
+    document.getElementById('g_id_signin').style.display = 'block';
+    document.getElementById('btn-manual-login').style.display = 'none';
+    document.getElementById('user-info').style.display = 'none';
+    document.getElementById('login-notice-banner').style.display = 'flex';
+    document.getElementById('admin-controls-panel').style.display = 'none';
+
+    saveLocal();
+    renderTable();
+    calculateAll();
+    updateUserModeUI();
+    updateStatus("offline", "已登出，目前為瀏覽模式");
+}
+
+function loadLocalDataForStore() {
+    members = JSON.parse(localStorage.getItem(`menu_order_members_${currentStoreId}`)) || [];
+    orders = JSON.parse(localStorage.getItem(`menu_order_orders_${currentStoreId}`)) || {};
+    orderNotes = JSON.parse(localStorage.getItem(`menu_order_notes_${currentStoreId}`)) || {};
+    updateOrderNoteInput();
+    renderOrderNotes();
+}
+
+function saveLocal() {
+    localStorage.setItem(`menu_order_members_${currentStoreId}`, JSON.stringify(members));
+    localStorage.setItem(`menu_order_orders_${currentStoreId}`, JSON.stringify(orders));
+    localStorage.setItem(`menu_order_notes_${currentStoreId}`, JSON.stringify(orderNotes));
+    localStorage.setItem("menu_order_current_store", currentStoreId);
+}
+
+function switchStore() {
+    if (isSubmitting) {
+        document.getElementById('store-select').value = currentStoreId;
+        return;
+    }
+    closeModal('admin-orders-modal');
+    const newStore = document.getElementById("store-select").value;
+    if (newStore === currentStoreId) return;
+
+    currentStoreId = newStore;
+    orderPayments = {};
+    refreshWallet();
+    const url = new URL(window.location);
+    url.searchParams.set('store', newStore);
+    window.history.pushState({}, '', url);
+
+    MENU_DATA = [];
+    members = [];
+    orders = {};
+    orderNotes = {};
+    updateOrderNoteInput();
+    renderOrderNotes();
+
+    renderTable();
+    updateBrand();
+    fetchFromGoogleDrive(false);
+}
+
+function renderStoreSelect() {
+    const select = document.getElementById("store-select");
+    select.innerHTML = "";
+    for (const storeId in ALL_STORES) {
+        const opt = document.createElement("option");
+        opt.value = storeId;
+        opt.innerText = ALL_STORES[storeId].name;
+        if (storeId === currentStoreId) {
+            opt.selected = true;
+        }
+        select.appendChild(opt);
+    }
+}
+
+function updateBrand() {
+    const storeInfo = ALL_STORES[currentStoreId] || { name: "載入中..." };
+    document.getElementById('store-brand-badge').innerText = storeInfo.name.substring(0, 2);
+    document.getElementById('store-title').textContent = storeInfo.name;
+    const message = document.getElementById('store-message');
+    message.textContent = String(storeInfo.message == null ? '' : storeInfo.message).trim();
+    message.hidden = !message.textContent;
+}
+
+function updateStatus(type, msg) {
+    const dot = document.getElementById("status-dot");
+    const text = document.getElementById("sync-status-text");
+    dot.className = "status-dot";
+    if (type === "syncing") dot.classList.add("syncing");
+    if (type === "offline") dot.classList.add("offline");
+    text.innerText = msg;
+}
+
+function updateUserModeUI() {
+    renderWalletUI();
+    const historyButton = document.getElementById('btn-last-order');
+    historyButton.style.display = currentUser ? 'inline-flex' : 'none';
+    historyButton.disabled = !currentUser || isMenuLocked || isSubmitting || !MENU_DATA.length;
+    const btnSubmit = document.getElementById('btn-submit-order');
+    const btnClearMyOrder = document.getElementById('btn-clear-my-order');
+
+    if (currentUser && !isMenuLocked) {
+        btnSubmit.disabled = isSubmitting;
+        btnSubmit.innerText = `送出 ${currentUser} 的點餐`;
+        btnClearMyOrder.disabled = isSubmitting;
+    } else {
+        btnSubmit.disabled = true;
+        btnClearMyOrder.disabled = true;
+        btnSubmit.innerText = isMenuLocked ? "已結單鎖定" : "請先登入後送出";
+    }
+    updateOrderNoteInput();
+}
+
+async function fetchFromGoogleDrive(isManual = false) {
+    if (!GOOGLE_GAS_API_URL || (isManual && isSubmitting)) return;
+    const requestedStoreId = currentStoreId;
+    updateStatus("syncing", "正在讀取最新資料...");
+    try {
+        const resp = await fetch(`${GOOGLE_GAS_API_URL}?storeId=${encodeURIComponent(requestedStoreId)}`, {
+            method: "GET",
+            redirect: "follow"
+        });
+        const resJson = await resp.json();
+        if (requestedStoreId !== currentStoreId) return;
+
+        if (resJson.status === "success") {
+            const data = resJson.data;
+            if (data.storeInfo) {
+                Object.defineProperty(ALL_STORES, requestedStoreId, {
+                    value: data.storeInfo, enumerable: true, configurable: true, writable: true
+                });
+                renderStoreSelect();
+                updateBrand();
+            }
+
+            if (data.warning) {
+                console.warn(data.warning);
+                palaceAlert(data.warning);
+            }
+
+            members = data.members || [];
+            orders = data.orders || {};
+            orderPayments = data.payments || {};
+            orderNotes = { ...(data.notes && typeof data.notes === 'object' ? data.notes : {}), ...(data.orderNotes && typeof data.orderNotes === 'object' ? data.orderNotes : {}) };
+            isMenuLocked = data.isLocked || false;
+            MENU_DATA = data.menuData || [];
+
+            document.getElementById('locked-notice-banner').style.display = isMenuLocked ? 'block' : 'none';
+
+
+            saveLocal();
+            renderOrderNotes();
+            renderTable();
+            calculateAll();
+            updateUserModeUI();
+            renderAdminPanelUI();
+            updateStatus("online", `同步成功 (${new Date().toLocaleTimeString('zh-TW')})`);
+            if (isManual) await refreshWallet();
+
+        } else {
+            throw new Error(resJson.message);
+        }
+    } catch (err) {
+        console.error(err);
+        updateStatus("offline", "雲端讀取失敗，使用本地暫存");
+        if (isManual) palaceAlert("雲端讀取失敗：" + err.message);
+    }
+}
+
+function renderTable() {
+    const tableMembers = getTableMembers();
+    const theadRow = document.getElementById("table-header-row");
+    const tfootRow = document.getElementById("table-foot-row");
+    const tbody = document.getElementById("matrix-tbody");
+
+    const optionNames = getOptionColumnNames();
+    const optionHeaders = optionNames.map(name => '<th>' + escapeMenuText(name) + '</th>').join('');
+    theadRow.innerHTML = '<th class="sticky-col-1 col-category">分類</th><th class="sticky-col-2">品項名稱</th>' + optionHeaders + '<th class="sticky-col-3">單價</th>';
+    tbody.closest('table').classList.toggle('has-option-columns', optionNames.length > 0);
+
+    tableMembers.forEach(member => {
+        const th = document.createElement("th");
+        th.innerText = member;
+        th.className = (member === currentUser) ? "current-user-col" : "readonly-col";
+        if (member === currentUser) th.innerText += " (我)";
+        theadRow.appendChild(th);
+    });
+
+    const thTotalQty = document.createElement("th");
+    thTotalQty.className = "col-summary-qty";
+    thTotalQty.innerText = "店家劃單總量";
+    theadRow.appendChild(thTotalQty);
+    const thTotalAmt = document.createElement("th");
+    thTotalAmt.className = "col-summary-amount";
+    thTotalAmt.innerText = "品項小計";
+    theadRow.appendChild(thTotalAmt);
+
+    tbody.innerHTML = "";
+    if (MENU_DATA.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${tableMembers.length + optionNames.length + 5}" style="text-align:center; padding: 2rem; color: var(--text-muted);">正在載入菜單，或此店家無菜單資料...</td></tr>`;
+    }
+    renderOptionPickers(tbody);
+    MENU_DATA.forEach(item => {
+        if (item.baseId) return;
+        const tr = document.createElement("tr");
+
+        tr.innerHTML = `
+            <td class="sticky-col-1 col-category"><span class="badge-category">${escapeMenuText(item.category)}</span></td>
+            <td class="sticky-col-2">${escapeMenuText(item.baseName || item.name)}</td>
+            ${optionNames.map(name => { const choice = (item.choices || []).find(c => c[0] === name); return `<td>${choice ? escapeMenuText(choice[1]) : '—'}</td>`; }).join('')}
+            <td class="sticky-col-3">$${item.price}</td>
+        `;
+
+        tableMembers.forEach(member => {
+            const td = document.createElement("td");
+            const userQty = (orders[member] && orders[member][item.id]) ? orders[member][item.id] : 0;
+            if (member === currentUser) {
+                td.className = "current-user-col";
+                td.innerHTML = `
+                    <div class="qty-control" ${isMenuLocked ? 'disabled' : ''}>
+                        <button class="qty-btn" onclick="updateQty('${item.id}', -1)">-</button>
+                        <input class="qty-input" type="text" id="qty_${item.id}" value="${userQty}" readonly>
+                        <button class="qty-btn" onclick="updateQty('${item.id}', 1)">+</button>
+                    </div>`;
+            } else {
+                td.className = "readonly-col";
+                td.innerHTML = `<span class="readonly-val ${userQty > 0 ? 'has-qty' : 'zero'}">${userQty}</span>`;
+            }
+            tr.appendChild(td);
+        });
+
+        tr.innerHTML += `
+            <td id="item_total_qty_${item.id}" class="col-summary-qty">0</td>
+            <td id="item_total_amt_${item.id}" class="col-summary-amount">NT$ 0</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    tfootRow.innerHTML = '<td class="sticky-col-1 col-category">統計</td><td class="sticky-col-2">個人應付總計</td>' + optionNames.map(() => '<td></td>').join('') + '<td class="sticky-col-3">-</td>';
+    tableMembers.forEach(member => {
+        const td = document.createElement("td");
+        td.id = `member_subtotal_${encodeURIComponent(member)}`;
+        if (member === currentUser) td.className = "current-user-col";
+        td.innerText = "NT$ 0";
+        tfootRow.appendChild(td);
+    });
+
+    const tdFootTotalQty = document.createElement("td");
+    tdFootTotalQty.id = "foot-total-qty";
+    tdFootTotalQty.className = "col-summary-qty";
+    tdFootTotalQty.innerText = "0";
+    tfootRow.appendChild(tdFootTotalQty);
+    const tdFootTotalAmt = document.createElement("td");
+    tdFootTotalAmt.id = "foot-total-amount";
+    tdFootTotalAmt.className = "col-summary-amount";
+    tdFootTotalAmt.innerText = "NT$ 0";
+    tfootRow.appendChild(tdFootTotalAmt);
+    updateFrozenColumns();
+}
+
+function getTableMembers() {
+    // 僅調整畫面顯示順序，保留 members 原始順序供儲存及登出使用。
+    return currentUser ? [currentUser, ...members.filter(member => member !== currentUser)] : members;
+}
+
+function updateQty(itemId, delta) {
+    if (isSubmitting) return;
+    if (!currentUser) { palaceAlert("請先登入或使用訪客模式！"); return; }
+    if (isMenuLocked) { palaceAlert("菜單已被鎖定，無法修改！"); return; }
+    if (!members.includes(currentUser)) members.push(currentUser);
+    if (!orders[currentUser]) orders[currentUser] = {};
+    let currentVal = Number(orders[currentUser][itemId] || 0);
+    currentVal = Math.min(99, Math.max(0, currentVal + delta));
+
+    if (currentVal === 0) delete orders[currentUser][itemId];
+    else orders[currentUser][itemId] = currentVal;
+
+    const inputElem = document.getElementById(`qty_${itemId}`);
+    if (inputElem) inputElem.value = currentVal;
+    saveLocal();
+    calculateAll();
+}
+
+function calculateAll() {
+    let grandTotalQty = 0;
+    let grandTotalAmount = 0;
+    const memberTotals = {};
+    members.forEach(m => memberTotals[m] = { qty: 0, amount: 0 });
+
+    MENU_DATA.forEach(item => {
+        let itemQty = 0;
+        members.forEach(m => {
+            const q = (orders[m] && orders[m][item.id]) ? Number(orders[m][item.id]) : 0;
+            itemQty += q;
+            memberTotals[m].qty += q;
+            memberTotals[m].amount += q * item.price;
+        });
+
+        const itemSubtotal = itemQty * item.price;
+        grandTotalQty += itemQty;
+        grandTotalAmount += itemSubtotal;
+
+        const elQty = document.getElementById(`item_total_qty_${item.id}`);
+        const elAmt = document.getElementById(`item_total_amt_${item.id}`);
+        if (elQty) elQty.innerText = itemQty;
+        if (elAmt) elAmt.innerText = `NT$ ${formatAmount(itemSubtotal)}`;
+    });
+
+    members.forEach(m => {
+        const td = document.getElementById(`member_subtotal_${encodeURIComponent(m)}`);
+        if (td) td.innerText = `NT$ ${formatAmount(memberTotals[m].amount)}`;
+    });
+
+    document.getElementById("foot-total-qty").innerText = grandTotalQty;
+    document.getElementById("foot-total-amount").innerText = `NT$ ${formatAmount(grandTotalAmount)}`;
+    document.getElementById("grand-total-amount").innerText = `NT$ ${formatAmount(grandTotalAmount)}`;
+    document.getElementById("grand-total-qty").innerText = `${grandTotalQty} 份`;
+    document.getElementById("total-members-count").innerText = `${members.length} 人`;
+    optionRowRefreshers.forEach(refresh => refresh());
+}
+
+function buildMyOrderReceipt(storeName, member, menu, memberOrders, note) {
+    const lines = [
+        '✅ ' + member + '點餐已送出',
+        '------------------------------------'
+    ];
+    let totalQuantity = 0;
+    let totalAmount = 0;
+    menu.forEach(item => {
+        const quantity = Number(memberOrders[item.id] || 0);
+        if (quantity <= 0) return;
+        const subtotal = quantity * Number(item.price);
+        totalQuantity += quantity;
+        totalAmount += subtotal;
+        lines.push(item.name + ' × ' + quantity);
+        lines.push('   單價 NT$ ' + formatPrice(item.price) + '｜小計 NT$ ' + formatAmount(subtotal));
+    });
+    const normalizedNote = normalizeOrderNote(note);
+    if (normalizedNote) lines.push('📝 備註：' + normalizedNote);
+    lines.push('------------------------------------');
+    lines.push('📦 總數量：' + totalQuantity);
+    lines.push('💰 下單金額：NT$ ' + formatAmount(totalAmount));
+    return lines.join('\n');
+}
+
+async function submitMyOrderToCloud() {
+    if (!currentUser) { palaceAlert("請先登入！"); return; }
+    if (isSubmitting) return;
+
+    const orderNote = normalizeOrderNote(document.getElementById('order-note-input').value);
+
+    if (!isGuestModeActive && !isTokenValid(currentIdToken)) {
+        await palaceAlert("登入憑證已過期，請點擊「重新登入」刷新憑證後再送出！");
+        triggerGoogleSignIn();
+        return;
+    }
+
+    isSubmitting = true;
+    updateStatus("syncing", "正在寫入訂單...");
+    document.getElementById("btn-submit-order").disabled = true;
+    updateUserModeUI();
+
+    try {
+        const store = currentStoreId, token = currentIdToken, user = currentUser;
+        const memberOrders = JSON.parse(JSON.stringify(orders[user] || {}));
+        const total = Math.round(MENU_DATA.reduce((s,i)=>s+Number(memberOrders[i.id] || 0)*Number(i.price),0)*100)/100;
+        let useWallet = false;
+        if (!isGuestModeActive) {
+            const wallet = await refreshWallet(true);
+            if (!wallet || store !== currentStoreId || token !== currentIdToken || user !== currentUser) return;
+            const available = Math.round((wallet.balance+wallet.currentDeduction)*100)/100;
+            if (total > 0 && (wallet.balance > 0 || wallet.currentDeduction > 0)) {
+                if (available >= total) {
+                    useWallet = await palaceConfirm('目前儲值餘額：NT$ '+formatAmount(wallet.balance)+
+                        (wallet.currentDeduction ? '\n原訂單已扣抵：NT$ '+formatAmount(wallet.currentDeduction) : '')+
+                        '\n本次訂單：NT$ '+formatAmount(total)+'\n扣抵後餘額：NT$ '+formatAmount(available-total)+
+                        '\n是否使用儲值全額扣抵？', {title:'選擇付款方式',confirmText:'使用儲值',cancelText:'其他付款方式',walletChoice:true});
+                } else {
+                    if (!await palaceConfirm('儲值可用金額：NT$ '+formatAmount(available)+'\n訂單金額：NT$ '+formatAmount(total)+
+                        '\n餘額不足，是否改以其他付款方式送出？'+(wallet.currentDeduction ? '\n原訂單扣抵將退回餘額。' : ''),
+                        {title:'儲值餘額不足',confirmText:'其他付款方式送出',cancelText:'取消送出'})) return;
+                }
+                if (useWallet === null) return;
+                if (!useWallet && available >= total && wallet.currentDeduction &&
+                    !await palaceConfirm('改以其他付款方式，原訂單已扣抵金額將退回儲值餘額，確定送出？')) return;
+            }
+        }
+        if (store !== currentStoreId || token !== currentIdToken || user !== currentUser || isMenuLocked) return;
+        const payload = {
+            action: "update_member",
+            storeId: currentStoreId,
+            storeName: ALL_STORES[currentStoreId]?.name || currentStoreId,
+            idToken: currentIdToken,
+            isGuest: isGuestModeActive,
+            targetMember: currentUser,
+            memberOrders,
+            useWallet,
+            orderNote: orderNote,
+            menuSummary: MENU_DATA.map(i => ({ id: i.id, category: i.category, name: i.name, price: i.price }))
+        };
+
+        payload.requestId = stableWalletRequestId('order', payload);
+        const resp = await fetch(GOOGLE_GAS_API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(payload),
+            redirect: "follow"
+        });
+
+        const resJson = await resp.json();
+        if (store !== currentStoreId || token !== currentIdToken || user !== currentUser) return;
+        if (resJson.status === "success") {
+            clearWalletRequest('order');
+            if (resJson.wallet) { walletData = resJson.wallet; renderWalletUI(); }
+            members = resJson.data.members || [];
+            orders = resJson.data.orders || {};
+            orderPayments = resJson.data.payments || {};
+            orderNotes = {...(resJson.data.notes || {}), ...(resJson.data.orderNotes || {})};
+            const removed = !members.includes(currentUser);
+            saveLocal();
+            renderOrderNotes();
+            updateStatus("online", "訂單已成功儲存！");
+            renderTable(); calculateAll(); updateOrderNoteInput();
+            palaceAlert(removed ? '訂單金額為 0，已清除此店家的訂購人資料、餐點與備註。'
+                : buildMyOrderReceipt(payload.storeName, payload.targetMember, payload.menuSummary,
+                    orders[payload.targetMember] || {}, orderNotes[payload.targetMember]) +
+                    (resJson.wallet ? '\n付款方式：'+(payload.useWallet ? '儲值全額扣抵' : '其他付款方式')+
+                    '\n目前儲值餘額：NT$ '+formatAmount(resJson.wallet.balance) : ''),
+                {title: '訂單送出結果'});
+            await fetchFromGoogleDrive(false);
+        } else {
+            throw new Error(resJson.message);
+        }
+    } catch (err) {
+        console.error(err);
+        updateStatus("offline", "送出失敗：" + err.message);
+        palaceAlert(`送出失敗：${err.message}`);
+    } finally {
+        isSubmitting = false;
+        updateUserModeUI();
+    }
+}
+
+async function adminAction(action, confirmMsg, details = {}) {
+    if (!currentIdToken) {
+        await palaceAlert("此操作需要管理員權限，請先透過 Google 帳號登入！");
+        triggerGoogleSignIn();
+        return;
+    }
+
+    // 檢查 Token 是否仍在有效期限內
+    if (!isTokenValid(currentIdToken)) {
+        await palaceAlert("⚠️ 您的 Google 登入憑證已超過 1 小時有效期限，請先重新點擊登入以獲取新憑證！");
+        triggerGoogleSignIn();
+        return;
+    }
+
+    if (isSubmitting) return;
+    if (confirmMsg && !await palaceConfirm(confirmMsg)) return;
+    if (isSubmitting || !currentIdToken || !isTokenValid(currentIdToken)) return;
+
+    isSubmitting = true;
+    updateStatus("syncing", "正在執行管理員操作...");
+    updateUserModeUI();
+    setAdminEditorBusy(true);
+
+    try {
+        const payload = {
+            ...details,
+            action: action,
+            storeId: currentStoreId,
+            storeName: ALL_STORES[currentStoreId]?.name || currentStoreId,
+            idToken: currentIdToken,
+            menuSummary: MENU_DATA.map(i => ({ id: i.id, category: i.category, name: i.name, price: i.price }))
+        };
+
+        if (['admin_update_member','admin_delete_member','admin_clear_all'].includes(action))
+            payload.requestId = stableWalletRequestId('admin-order', payload);
+        const resp = await fetch(GOOGLE_GAS_API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(payload),
+            redirect: "follow"
+        });
+
+        const resJson = await resp.json();
+        if (resJson.status === "success") {
+            clearWalletRequest('admin-order');
+            if (resJson.wallet) { walletData = resJson.wallet; renderWalletUI(); }
+            updateStatus("online", "管理員操作完成！");
+            members = resJson.data.members || [];
+            orders = resJson.data.orders || {};
+            orderPayments = resJson.data.payments || {};
+            orderNotes = {...(resJson.data.notes || {}), ...(resJson.data.orderNotes || {})};
+            isMenuLocked = !!resJson.data.isLocked;
+            saveLocal(); renderTable(); calculateAll(); renderOrderNotes();
+            updateUserModeUI(); renderAdminPanelUI();
+            closeModal('admin-orders-modal');
+            palaceAlert("✅ 操作成功！");
+            await fetchFromGoogleDrive(false);
+        } else {
+            throw new Error(resJson.message);
+        }
+    } catch (err) {
+        console.error(err);
+        updateStatus("offline", "操作失敗：" + err.message);
+        palaceAlert("❌ 操作失敗：" + err.message);
+    } finally {
+        isSubmitting = false;
+        updateUserModeUI();
+        setAdminEditorBusy(false);
+    }
+}
+
+async function clearMyOrder() {
+    if (isSubmitting) return;
+    if (!currentUser) return;
+    if (await palaceConfirm(`確定要清空 ${currentUser} 在此店家的所有餐點數量嗎？`)) {
+        orders[currentUser] = {};
+        saveLocal();
+        renderTable();
+        calculateAll();
+    }
+}
+
+async function adminClearAllOrders() {
+    const promptResponse = await palacePrompt("⚠️ 注意：此動作將清空此店家【所有同仁的點餐資料】並【自動解鎖菜單】重新開放點餐！已扣抵金額不退回，儲值交易紀錄會保留。\n\n請輸入 `RESET` 確認執行：");
+    if (promptResponse === "RESET") {
+        adminAction('admin_clear_all', null);
+    } else if (promptResponse !== null) {
+        palaceAlert("輸入代碼不符，操作已取消。");
+    }
+}
+
+function adminLockMenu() {
+    adminAction('admin_lock_menu', '確定要結單並鎖定此菜單嗎？鎖定後所有人將無法再編輯。');
+}
+
+function adminUnlockMenu() {
+    adminAction('admin_unlock_menu', '確定要解鎖此菜單嗎？解鎖後所有人將可以重新編輯。');
+}
+
+let adminEditorStore = '';
+let adminEditorInputs = [];
+
+function setAdminEditorBusy(busy) {
+    ['btn-admin-save-member', 'btn-admin-delete-member', 'admin-member-select', 'admin-order-note'].forEach(id => {
+        document.getElementById(id).disabled = busy || !document.getElementById('admin-member-select').value;
+    });
+    adminEditorInputs.forEach(({input, buttons, control}) => {
+        input.disabled = busy;
+        buttons.forEach(button => button.disabled = busy);
+        if (busy) control.setAttribute('disabled', '');
+        else control.removeAttribute('disabled');
+    });
+}
+
+function openAdminOrders() {
+    if (!isCurrentUserAdmin || isSubmitting) return;
+    adminEditorStore = currentStoreId;
+    const select = document.getElementById('admin-member-select');
+    select.replaceChildren();
+    members.filter(member => Object.prototype.hasOwnProperty.call(orders, member)).forEach(member => {
+        const option = document.createElement('option');
+        option.value = member; option.textContent = member;
+        select.appendChild(option);
+    });
+    renderAdminOrderEditor();
+    document.getElementById('admin-orders-modal').style.display = 'flex';
+}
+
+function renderAdminOrderEditor() {
+    const member = document.getElementById('admin-member-select').value;
+    const list = document.getElementById('admin-order-items');
+    list.replaceChildren(); adminEditorInputs = [];
+    const message = document.getElementById('admin-order-message');
+    message.textContent = member ? '' : '目前沒有可管理的使用者訂單。';
+    message.style.display = member ? 'none' : 'block';
+    document.getElementById('admin-order-note').value = member ? normalizeOrderNote(orderNotes[member]) : '';
+    if (member) {
+        const known = new Set(MENU_DATA.map(item => item.id));
+        const items = [...MENU_DATA, ...Object.keys(orders[member] || {}).filter(id => !known.has(id))
+            .map(id => ({id, name: '已下架品項：' + id, price: null, category: '舊品項'}))];
+        items.forEach(item => {
+            const label = document.createElement('div');
+            label.className = 'order-item-chip';
+            const originallyOrdered = Number((orders[member] || {})[item.id] || 0) > 0;
+            label.classList.toggle('admin-order-selected', originallyOrdered);
+            const name = document.createElement('span');
+            name.textContent = '[' + item.category + '] ' + item.name +
+                (item.price === null ? '（請設為 0 移除後再儲存）' : ' $' + formatPrice(item.price));
+            const input = document.createElement('input');
+            input.className = 'qty-input'; input.type = 'text'; input.readOnly = true;
+            input.value = Number((orders[member] || {})[item.id] || 0);
+            input.setAttribute('aria-label', item.name + ' 數量');
+            const control = document.createElement('div');
+            control.className = 'qty-control';
+            const buttons = [];
+            [-1, 1].forEach(delta => {
+                const button = document.createElement('button');
+                button.type = 'button'; button.className = 'qty-btn';
+                button.textContent = delta < 0 ? '-' : '+';
+                button.setAttribute('aria-label', item.name + (delta < 0 ? ' 減少數量' : ' 增加數量'));
+                button.onclick = () => {
+                    if (isSubmitting) return;
+                    input.value = Math.min(99, Math.max(0, Number(input.value || 0) + delta));
+                    label.classList.toggle('admin-order-selected', originallyOrdered || Number(input.value) > 0);
+                    updateAdminOrderTotal();
+                };
+                buttons.push(button); control.appendChild(button);
+                if (delta < 0) control.appendChild(input);
+            });
+            label.append(name, control); list.appendChild(label);
+            adminEditorInputs.push({item, input, buttons, control});
+        });
+    }
+    setAdminEditorBusy(isSubmitting);
+    updateAdminOrderTotal();
+}
+
+function updateAdminOrderTotal() {
+    const total = adminEditorInputs.reduce((sum, {item, input}) => sum + Number(input.value || 0) * (item.price || 0), 0);
+    document.getElementById('admin-order-total').textContent = '修改後金額：NT$ ' + formatAmount(total);
+}
+
+async function saveAdminMemberOrder() {
+    if (isSubmitting || !isCurrentUserAdmin || adminEditorStore !== currentStoreId) return;
+    const member = document.getElementById('admin-member-select').value;
+    if (!member) return;
+    const memberOrders = {};
+    for (const {item, input} of adminEditorInputs) {
+        const qty = Number(input.value);
+        if (input.value === '' || !Number.isInteger(qty) || qty < 0 || qty > 99) {
+            await palaceAlert('數量須為 0 到 99 的整數。'); input.focus(); return;
+        }
+        if (qty > 0 && item.price === null) {
+            await palaceAlert('已下架品項請先設為 0；也可以直接刪除此人訂單。'); input.focus(); return;
+        }
+        if (qty > 0) Object.defineProperty(memberOrders, item.id, {value: qty, enumerable: true});
+    }
+    const total = adminEditorInputs.reduce((sum, {item, input}) => sum + Number(input.value) * (item.price || 0), 0);
+    adminAction('admin_update_member', total === 0
+        ? '修改後金額為 0，將清除 ' + member + ' 的訂單、姓名與備註，確定繼續？'
+        : '確定儲存 ' + member + ' 的訂單修改？', {
+        targetMember: member, memberOrders,
+        orderNote: normalizeOrderNote(document.getElementById('admin-order-note').value)
+    });
+}
+
+function deleteAdminMemberOrder() {
+    if (isSubmitting || !isCurrentUserAdmin || adminEditorStore !== currentStoreId) return;
+    const member = document.getElementById('admin-member-select').value;
+    if (!member) return;
+    adminAction('admin_delete_member', '確定刪除 ' + member + ' 在此店家的訂單、姓名與備註？', {targetMember: member});
+}
+
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+function openKitchenModal() {
+    const listBody = document.getElementById("kitchen-list-body");
+    listBody.innerHTML = "";
+    let hasItems = false;
+    MENU_DATA.forEach(item => {
+        let count = members.reduce((sum, m) => sum + Number((orders[m] && orders[m][item.id]) || 0), 0);
+        if (count > 0) {
+            hasItems = true;
+            listBody.innerHTML += `<div class="order-item-chip"><span><strong>[${item.category}]</strong> ${item.name}</span><span style="color: var(--accent-orange); font-weight: bold;">${count} ${item.unit || '份'}</span></div>`;
+        }
+    });
+    if (!hasItems) listBody.innerHTML = "<div style='text-align:center; padding: 20px; color: var(--text-muted);'>目前無任何人點餐！</div>";
+    document.getElementById("kitchen-modal").style.display = "flex";
+}
+
+function openShareModal() {
+    const storeInfo = ALL_STORES[currentStoreId] || { name: "點餐" };
+    let text = `🍱【${storeInfo.name} 點餐收費名單】\n`;
+    text += `📅 統計時間：${new Date().toLocaleDateString('zh-TW')} ${new Date().toLocaleTimeString('zh-TW', {hour: '2-digit', minute:'2-digit'})}\n`;
+    text += `------------------------------------\n`;
+    let grandAmount = 0;
+    let grandDue = 0;
+
+    members.forEach(m => {
+        let mTotal = 0;
+        let mItems = [];
+        MENU_DATA.forEach(item => {
+            const q = (orders[m] && orders[m][item.id]) ? Number(orders[m][item.id]) : 0;
+            if (q > 0) {
+                mTotal += q * item.price;
+                mItems.push(`${item.name} x${q}`);
+            }
+        });
+
+        if (mItems.length > 0) {
+            grandAmount += mTotal;
+            const deducted = (orderPayments[m]?.amountCents || 0)/100;
+            const due = Math.max(0, Math.round((mTotal-deducted)*100)/100);
+            grandDue += due;
+            text += `👤 ${m}：$${formatAmount(mTotal)}\n   明細：${mItems.join(", ")}\n`;
+            text += '   儲值已扣抵：$'+formatAmount(deducted)+'；尚需付款：$'+formatAmount(due)+'\n';
+            const note = normalizeOrderNote(orderNotes[m]).replace(/[\r\n]+/g, ' ');
+            if (note) text += `   📝 備註：${note}\n`;
+        }
+    });
+
+    text += `------------------------------------\n`;
+    text += `💰 訂單總金額：NT$ ${formatAmount(grandAmount)}\n尚需收款：NT$ ${formatAmount(grandDue)}\n`;
+    text += `請大家備好零錢或透過 LINE Pay 轉帳，謝謝！`;
+
+    document.getElementById("share-text-area").value = text;
+    document.getElementById("share-modal").style.display = "flex";
+}
+
+function copyShareText() {
+    const area = document.getElementById("share-text-area");
+    area.select();
+    try {
+        navigator.clipboard.writeText(area.value).then(() => palaceAlert("已成功複製 LINE 明細至剪貼簿！"))
+        .catch(() => { document.execCommand("copy"); palaceAlert("已複製到剪貼簿 (備用模式)！"); });
+    } catch (e) {
+        document.execCommand("copy");
+        palaceAlert("已複製到剪貼簿 (備用模式)！");
+    }
+}
+
+function escapeMenuText(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function getOptionColumnNames() {
+    return [...new Set(MENU_DATA.flatMap(item => (item.options || []).map(group => group.name)))];
+}
+
+const optionSelectionCache = new Map();
+let optionRowRefreshers = [];
+
+function renderOptionPickers(tbody) {
+    optionRowRefreshers = [];
+    const seen = new Set();
+    const optionNames = getOptionColumnNames();
+    MENU_DATA.forEach(item => {
+        if (!item.baseId || seen.has(item.baseId)) return;
+        seen.add(item.baseId);
+        const row = document.createElement('tr');
+        row.innerHTML = '<td class="sticky-col-1 col-category"><span class="badge-category">' + escapeMenuText(item.category) + '</span></td><td class="sticky-col-2">' + escapeMenuText(item.baseName) + '</td>';
+        const selects = new Map();
+        const selectionKey = JSON.stringify([currentStoreId, item.baseId]);
+        const savedChoices = optionSelectionCache.get(selectionKey) || {};
+        const memberCells = [];
+        const summaryCells = [];
+        optionNames.forEach(name => {
+            const td = document.createElement('td');
+            const group = item.options.find(g => g.name === name);
+            if (group) {
+                const select = document.createElement('select');
+                select.className = 'select-store';
+                select.setAttribute('aria-label', item.baseName + ' ' + name);
+                select.disabled = !currentUser || isMenuLocked;
+                group.values.forEach(value => {
+                    const option = document.createElement('option');
+                    option.value = value; option.textContent = value;
+                    select.appendChild(option);
+                });
+                if (group.values.includes(savedChoices[name])) select.value = savedChoices[name];
+                selects.set(name, select); td.appendChild(select);
+            } else td.textContent = '—';
+            row.appendChild(td);
+        });
+        const price = document.createElement('td');
+        price.className = 'sticky-col-3'; price.textContent = '$' + formatPrice(item.price);
+        row.appendChild(price);
+        const selectedVariant = () => MENU_DATA.find(v => v.baseId === item.baseId && v.choices.every(c => c[1] === selects.get(c[0]).value));
+        getTableMembers().forEach(member => {
+            const td = document.createElement('td');
+            td.className = member === currentUser ? 'current-user-col' : 'readonly-col';
+            let value;
+            if (member === currentUser) {
+                const control = document.createElement('div');
+                control.className = 'qty-control';
+                if (isMenuLocked) control.setAttribute('disabled', '');
+                value = document.createElement('input');
+                value.className = 'qty-input'; value.type = 'text'; value.readOnly = true;
+                value.setAttribute('aria-label', item.baseName + ' 數量');
+                [-1, 1].forEach(delta => {
+                    const button = document.createElement('button');
+                    button.className = 'qty-btn'; button.textContent = delta < 0 ? '-' : '+';
+                    button.disabled = isMenuLocked;
+                    button.onclick = () => {
+                        const variant = selectedVariant();
+                        if (variant) updateQty(variant.id, delta);
+                    };
+                    control.appendChild(button);
+                    if (delta < 0) control.appendChild(value);
+                });
+                td.appendChild(control);
+            } else {
+                value = document.createElement('span'); td.appendChild(value);
+            }
+            memberCells.push({member, value}); row.appendChild(td);
+        });
+        ['col-summary-qty', 'col-summary-amount'].forEach(className => {
+            const td = document.createElement('td');
+            td.className = className; summaryCells.push(td); row.appendChild(td);
+        });
+        const refresh = () => {
+            const variant = selectedVariant();
+            let total = 0;
+            memberCells.forEach(({member, value}) => {
+                const qty = variant ? Number((orders[member] || {})[variant.id] || 0) : 0;
+                total += qty;
+                if (member === currentUser) value.value = qty;
+                else { value.textContent = qty; value.className = 'readonly-val ' + (qty > 0 ? 'has-qty' : 'zero'); }
+            });
+            summaryCells[0].textContent = total;
+            summaryCells[1].textContent = 'NT$ ' + formatAmount(total * (variant ? variant.price : 0));
+        };
+        selects.forEach(select => {
+            select.onchange = () => {
+                optionSelectionCache.set(selectionKey, Object.fromEntries([...selects].map(([name, input]) => [name, input.value])));
+                refresh();
+            };
+        });
+        optionRowRefreshers.push(refresh);
+        refresh();
+        tbody.appendChild(row);
+    });
+}
+
+async function loadLastOrder() {
+    if (!currentUser || isMenuLocked || isSubmitting || !MENU_DATA.length) return;
+    const storeId = currentStoreId, user = currentUser, token = currentIdToken;
+    isSubmitting = true; updateUserModeUI();
+    try {
+        const resp = await fetch(GOOGLE_GAS_API_URL, {
+            method: 'POST', headers: {'Content-Type':'text/plain;charset=utf-8'}, redirect:'follow',
+            body: JSON.stringify({action:'get_last_order', storeId, idToken:token,
+                isGuest:isGuestModeActive, targetMember:user})
+        });
+        const result = await resp.json();
+        if (storeId !== currentStoreId || user !== currentUser || token !== currentIdToken) return;
+        if (result.status !== 'success') throw new Error(result.message);
+        if (!result.data) { palaceAlert('此使用者在這家店尚無上次訂單。'); return; }
+        if (isMenuLocked) return;
+        if (!await palaceConfirm('將以上次訂單取代目前尚未送出的餐點與備註，是否帶入？', {title:'帶入上次訂單', confirmText:'帶入訂單'})) return;
+        if (storeId !== currentStoreId || user !== currentUser || token !== currentIdToken || isMenuLocked) return;
+        const valid = new Set(MENU_DATA.map(i => i.id));
+        const restored = {}, skipped = [];
+        Object.entries(result.data.orders || {}).forEach(([id, qty]) => {
+            if (valid.has(id)) restored[id] = Math.min(99, Math.max(0, Math.floor(Number(qty) || 0)));
+            else skipped.push(id);
+        });
+        orders[user] = restored;
+        if (!members.includes(user)) members.push(user);
+        orderNotes[user] = normalizeOrderNote(result.data.orderNote);
+        saveLocal(); renderTable(); calculateAll(); renderOrderNotes();
+        palaceAlert('已帶入上次訂單，金額依目前菜單計算；確認後請按送出。' + (skipped.length ? `\n${skipped.length} 個已移除或變更的品項／選項未帶入。` : ''));
+    } catch (err) { palaceAlert('讀取上次訂單失敗：' + err.message); }
+    finally { isSubmitting = false; updateUserModeUI(); }
+}
+
+
+function updateFrozenColumns() {
+    const table = document.getElementById('matrix-table');
+    const header = document.getElementById('table-header-row');
+    if (!table || !header) return;
+    const headers = Array.from(header.children);
+    const boundary = headers.findIndex(cell => cell.classList.contains('sticky-col-3'));
+    let offset = 0;
+    const offsets = headers.slice(0, boundary).map(cell => {
+        const left = offset;
+        offset += cell.getBoundingClientRect().width;
+        return left;
+    });
+    Array.from(table.rows).forEach(row => {
+        Array.from(row.cells).forEach((cell, index) => {
+            const frozen = index < boundary && cell.colSpan === 1;
+            cell.classList.toggle('frozen-left', frozen);
+            cell.classList.toggle('frozen-edge', frozen && index === boundary - 1);
+            if (frozen) cell.style.setProperty('--frozen-left', offsets[index] + 'px');
+            else cell.style.removeProperty('--frozen-left');
+        });
+    });
+}
+
+// 欄寬、視窗及手機隱藏分類欄變動時，重新依實際寬度定位。
+window.addEventListener('resize', updateFrozenColumns);
+if (typeof ResizeObserver !== 'undefined') {
+    const frozenColumnObserver = new ResizeObserver(updateFrozenColumns);
+    frozenColumnObserver.observe(document.getElementById('matrix-table'));
+    frozenColumnObserver.observe(document.getElementById('table-header-row'));
+}
+
+
+// ===== Google Email 儲值介面 =====
+
+function resetWalletUI() {
+    walletData = null;
+    document.getElementById('wallet-panel').style.display = 'none';
+    document.getElementById('wallet-history-body').replaceChildren();
+    document.getElementById('admin-wallet-list').replaceChildren();
+    closeModal('wallet-history-modal'); closeModal('admin-wallet-modal');
+}
+function renderWalletUI() {
+    const visible = !isGuestModeActive && currentIdToken && walletData && walletData.exists &&
+        walletData.email === currentUserEmail.toLowerCase().trim();
+    document.getElementById('wallet-panel').style.display = visible ? 'flex' : 'none';
+    if (visible) document.getElementById('wallet-balance').textContent = '儲值餘額：NT$ '+formatAmount(walletData.balance);
+}
+async function walletApi(action, details = {}) {
+    if (!currentIdToken || isGuestModeActive || !isTokenValid(currentIdToken)) throw new Error('請重新使用 Google 帳號登入。');
+    const token = currentIdToken;
+    const resp = await fetch(GOOGLE_GAS_API_URL, {method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+        redirect:'follow',body:JSON.stringify({...details,action,idToken:token})});
+    const result = await resp.json();
+    if (token !== currentIdToken) throw new Error('登入帳號已變更，請重新操作。');
+    if (result.status !== 'success') throw new Error(result.message || '儲值服務回應異常。');
+    return result.data;
+}
+async function refreshWallet(required = false) {
+    if (!currentIdToken || isGuestModeActive) { resetWalletUI(); return null; }
+    const store = currentStoreId;
+    try {
+        const data = await walletApi('get_wallet',{storeId:store});
+        if (store !== currentStoreId) return null;
+        walletData = data; renderWalletUI(); return data;
+    } catch (e) {
+        walletData = null; renderWalletUI();
+        if (required) throw new Error('無法確認儲值餘額：'+e.message);
+        return null;
+    }
+}
+function stableWalletRequestId(scope, payload) {
+    const copy = {...payload}; delete copy.idToken; delete copy.requestId; delete copy.menuSummary;
+    const fingerprint = JSON.stringify(copy), key = 'lunch_wallet_request_'+scope;
+    let saved; try { saved = JSON.parse(sessionStorage.getItem(key)); } catch(e) {}
+    if (saved && saved.fingerprint === fingerprint) return saved.id;
+    const id = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)+'_'+Array.from(crypto.getRandomValues(new Uint32Array(4))).join('_');
+    sessionStorage.setItem(key, JSON.stringify({id,fingerprint})); return id;
+}
+function clearWalletRequest(scope) { sessionStorage.removeItem('lunch_wallet_request_'+scope); }
+function walletItemText(raw) {
+    try { const items=JSON.parse(raw || '[]');return Array.isArray(items) ? items.map(i=>i.name+' ×'+i.qty+'（NT$ '+formatAmount(i.price)+'）').join('、') : raw; }
+    catch(e){return raw;}
+}
+function renderWalletHistory(data) {
+    const body = document.getElementById('wallet-history-body'); body.replaceChildren();
+    const heading = document.createElement('p'); heading.textContent = data.email+'｜目前餘額 NT$ '+formatAmount(data.balance); body.appendChild(heading);
+    if (!data.history.length) { const p=document.createElement('p');p.textContent='尚無交易紀錄。';body.appendChild(p);return; }
+    const table=document.createElement('table'); table.style.cssText='width:100%;border-collapse:collapse;text-align:left';
+    const row=document.createElement('tr');
+    ['時間','類型／訂單','異動','餘額','備註'].forEach(t=>{const th=document.createElement('th');th.textContent=t;row.appendChild(th);});table.appendChild(row);
+    data.history.forEach(tx=>{
+        const tr=document.createElement('tr');
+        [new Date(tx.time).toLocaleString('zh-TW'), tx.type+(tx.storeId?'｜'+(ALL_STORES[tx.storeId]?.name || tx.storeId):'')+
+         (tx.orderId?'\n訂單：'+tx.orderId+'\n訂單金額：NT$ '+formatAmount(tx.orderTotal)+'\n品項：'+walletItemText(tx.items):''),
+         (Number(tx.amount)>0?'+':'')+formatAmount(tx.amount),formatAmount(tx.balanceAfter),tx.note].forEach(t=>{
+            const td=document.createElement('td');td.textContent=t;td.style.cssText='padding:10px 5px;white-space:pre-wrap;border-bottom:1px solid #d8cbb2;overflow-wrap:anywhere';tr.appendChild(td);
+        });table.appendChild(tr);
+    });body.appendChild(table);
+}
+async function openWalletHistory() {
+    try { const data=await refreshWallet(true); if(!data)return; renderWalletHistory(data); document.getElementById('wallet-history-modal').style.display='flex'; }
+    catch(e){palaceAlert(e.message);}
+}
+async function loadAdminWallets() {
+    const accounts=await walletApi('admin_list_wallets');
+    if (!isCurrentUserAdmin) return;
+    const list=document.getElementById('admin-wallet-list');list.replaceChildren();
+    if (!accounts.length) list.textContent='尚無儲值帳號，可直接輸入 Google Email 新增儲值。';
+    accounts.forEach(a=>{
+        const row=document.createElement('div');row.className='order-item-chip';
+        const text=document.createElement('span');text.textContent=a.email+'｜NT$ '+formatAmount(a.balance);
+        const choose=document.createElement('button');choose.className='btn-secondary';choose.textContent='選取帳號';choose.onclick=()=>document.getElementById('wallet-email').value=a.email;
+        const history=document.createElement('button');history.className='btn-secondary';history.textContent='交易紀錄';history.onclick=async()=>{
+            try {const data=await walletApi('get_wallet_admin_history',{email:a.email});renderWalletHistory(data);document.getElementById('wallet-history-modal').style.display='flex';}
+            catch(e){palaceAlert(e.message);}
+        };row.append(text,choose,history);list.appendChild(row);
+    });
+}
+async function openAdminWallets() {
+    if (!isCurrentUserAdmin || isSubmitting) return;
+    document.getElementById('admin-wallet-modal').style.display='flex';
+    try {await loadAdminWallets();}catch(e){palaceAlert(e.message);}
+}
+async function adjustWallet() {
+    if (!isCurrentUserAdmin || isSubmitting) return;
+    const email=document.getElementById('wallet-email').value.trim().toLowerCase();
+    const raw=document.getElementById('wallet-amount').value;
+    const amount=Number(raw), reason=document.getElementById('wallet-reason').value.trim();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !raw || !Number.isFinite(amount) || amount===0 || Math.abs(amount*100-Math.round(amount*100))>0.00001 || !reason){palaceAlert('請填寫有效 Email、非零金額（最多兩位小數）及原因。');return;}
+    isSubmitting=true;updateUserModeUI();document.getElementById('wallet-adjust-button').disabled=true;
+    try {
+        if(!await palaceConfirm(email+'\n'+(amount>0?'新增儲值':'扣減調整')+' NT$ '+formatAmount(Math.abs(amount))+'\n原因：'+reason,{title:'確認儲值異動'}))return;
+        const payload={email,amount,reason};payload.requestId=stableWalletRequestId('adjust',payload);
+        const data=await walletApi('admin_adjust_wallet',payload);clearWalletRequest('adjust');
+        document.getElementById('wallet-amount').value='';document.getElementById('wallet-reason').value='';
+        await palaceAlert('異動完成。'+email+' 餘額：NT$ '+formatAmount(data.balance));
+        await loadAdminWallets();await refreshWallet();
+    }catch(e){palaceAlert('儲值操作失敗：'+e.message);}
+    finally{isSubmitting=false;updateUserModeUI();document.getElementById('wallet-adjust-button').disabled=false;}
+}
+</script>
+</body>
+</html>
