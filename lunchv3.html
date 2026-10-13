@@ -1958,11 +1958,11 @@ async function walletApi(action, details = {}) {
     if (result.status !== 'success') throw new Error(result.message || '儲值服務回應異常。');
     return result.data;
 }
-async function refreshWallet(required = false) {
+async function refreshWallet(required = false, includeHistory = false) {
     if (!currentIdToken || isGuestModeActive) { resetWalletUI(); return null; }
     const store = currentStoreId;
     try {
-        const data = await walletApi('get_wallet',{storeId:store});
+        const data = await walletApi('get_wallet',{storeId:store,includeHistory});
         if (store !== currentStoreId) return null;
         walletData = data; renderWalletUI(); return data;
     } catch (e) {
@@ -1976,7 +1976,8 @@ function stableWalletRequestId(scope, payload) {
     const fingerprint = JSON.stringify(copy), key = 'lunch_wallet_request_'+scope;
     let saved; try { saved = JSON.parse(sessionStorage.getItem(key)); } catch(e) {}
     if (saved && saved.fingerprint === fingerprint) return saved.id;
-    const id = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)+'_'+Array.from(crypto.getRandomValues(new Uint32Array(4))).join('_');
+    const nonce = crypto.randomUUID ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint32Array(4))).join('_');
+    const id = 'v5_'+Date.now().toString(36)+'_'+nonce;
     sessionStorage.setItem(key, JSON.stringify({id,fingerprint})); return id;
 }
 function clearWalletRequest(scope) { sessionStorage.removeItem('lunch_wallet_request_'+scope); }
@@ -2001,7 +2002,7 @@ function renderWalletHistory(data) {
     });body.appendChild(table);
 }
 async function openWalletHistory() {
-    try { const data=await refreshWallet(true); if(!data)return; renderWalletHistory(data); document.getElementById('wallet-history-modal').style.display='flex'; }
+    try { const data=await refreshWallet(true, true); if(!data)return; renderWalletHistory(data); document.getElementById('wallet-history-modal').style.display='flex'; }
     catch(e){palaceAlert(e.message);}
 }
 async function loadAdminWallets() {
