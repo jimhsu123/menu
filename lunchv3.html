@@ -377,6 +377,13 @@ body, button, input, select, textarea.summary-text,
 .palace-dialog-actions button {min-width:104px;justify-content:center;min-height:38px;}
 @media(max-width:480px){.palace-dialog-body{padding:16px 20px;}.palace-dialog-actions{padding:5px 10px 5px 20px;}.palace-dialog-actions button{flex:1;min-width:0;}}
 
+
+/* 儲值資訊與訂單備註排列在同一列。 */
+.wallet-inline { display:flex; align-items:center; flex-wrap:wrap; gap:12px; }
+#wallet-balance { white-space:nowrap; font-size:14px; }
+#admin-wallet-modal input:focus,
+#admin-wallet-modal input:focus-visible { outline:none; box-shadow:none; border-color:#986b28; }
+#admin-wallet-modal .wallet-form-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; margin-bottom:4px; }
 </style>
 </head>
 <body>
@@ -407,6 +414,10 @@ body, button, input, select, textarea.summary-text,
             </div>
 
             <button class="btn-submit-main" id="btn-submit-order" onclick="submitMyOrderToCloud()" disabled>送出我的點餐</button>
+            <div id="wallet-panel" class="wallet-inline" style="display:none">
+              <strong id="wallet-balance">儲值餘額載入中</strong>
+              <button class="btn-secondary" onclick="openWalletHistory()">儲值／扣抵紀錄</button>
+            </div>
             <div class="order-note-field"><label for="order-note-input">📝 訂單備註</label><input id="order-note-input" type="text" maxlength="200" placeholder="例如：不要香菜（最多 200 字）" disabled></div>
             <button class="btn-secondary" onclick="fetchFromGoogleDrive(true)">重新整理</button>
         </div>
@@ -416,12 +427,6 @@ body, button, input, select, textarea.summary-text,
         </div>
     </div>
 
-    <div id="wallet-panel" class="submit-panel" style="display:none">
-      <strong id="wallet-balance">儲值餘額載入中</strong>
-      <span>各店共用・餘額足夠才可全額扣抵</span>
-      <button class="btn-secondary" onclick="openWalletHistory()">儲值／扣抵紀錄</button>
-      <button class="btn-secondary" onclick="refreshWallet(true).catch(e=>palaceAlert(e.message))">更新餘額</button>
-    </div>
     <!-- Admin Panel (管理員面板) -->
     <div class="admin-panel" id="admin-controls-panel">
         <span class="admin-panel-title">⭐ 管理員面板</span>
@@ -572,7 +577,7 @@ body, button, input, select, textarea.summary-text,
    <label for="wallet-email">Google Email</label><input id="wallet-email" type="email" class="select-store" placeholder="name@infotimes.com.tw" style="width:100%;box-sizing:border-box">
    <label for="wallet-amount">異動金額（NT$，最多兩位小數）</label><input id="wallet-amount" type="number" step="0.01" class="select-store" style="width:100%;box-sizing:border-box">
    <label for="wallet-reason">原因／備註</label><input id="wallet-reason" maxlength="200" class="select-store" style="width:100%;box-sizing:border-box">
-   <p><button id="wallet-adjust-button" class="btn-primary" onclick="adjustWallet()">確認儲值／調整</button>
+   <p class="wallet-form-actions"><button id="wallet-adjust-button" class="btn-primary" onclick="adjustWallet()">確認儲值／調整</button>
    <button class="btn-secondary" onclick="loadAdminWallets().catch(e=>palaceAlert(e.message))">重新整理帳號</button></p>
    <div id="admin-wallet-list"></div>
   </div>
@@ -1110,7 +1115,7 @@ function updateUserModeUI() {
 
     if (currentUser && !isMenuLocked) {
         btnSubmit.disabled = isSubmitting;
-        btnSubmit.innerText = `送出 ${currentUser} 的點餐`;
+        btnSubmit.innerText = isSubmitting ? "處理訂單中…" : `送出 ${currentUser} 的點餐`;
         btnClearMyOrder.disabled = isSubmitting;
     } else {
         btnSubmit.disabled = true;
@@ -1364,12 +1369,15 @@ async function submitMyOrderToCloud() {
         return;
     }
 
+    let refreshAfterCancellation = false;
     isSubmitting = true;
-    updateStatus("syncing", "正在寫入訂單...");
+    updateStatus("syncing", "正在確認訂單...");
     document.getElementById("btn-submit-order").disabled = true;
     updateUserModeUI();
 
     try {
+        // 先讓瀏覽器顯示送出狀態，再準備資料。
+        await new Promise(resolve => setTimeout(resolve, 0));
         const store = currentStoreId, token = currentIdToken, user = currentUser;
         const memberOrders = JSON.parse(JSON.stringify(orders[user] || {}));
         const total = Math.round(MENU_DATA.reduce((s,i)=>s+Number(memberOrders[i.id] || 0)*Number(i.price),0)*100)/100;
@@ -1387,11 +1395,20 @@ async function submitMyOrderToCloud() {
                 } else {
                     if (!await palaceConfirm('儲值可用金額：NT$ '+formatAmount(available)+'\n訂單金額：NT$ '+formatAmount(total)+
                         '\n餘額不足，是否改以其他付款方式送出？'+(wallet.currentDeduction ? '\n原訂單扣抵將退回餘額。' : ''),
-                        {title:'儲值餘額不足',confirmText:'其他付款方式送出',cancelText:'取消送出'})) return;
+                        {title:'儲值餘額不足',confirmText:'其他付款方式送出',cancelText:'取消送出'})) {
+                        refreshAfterCancellation = true;
+                        return;
+                    }
                 }
-                if (useWallet === null) return;
+                if (useWallet === null) {
+                    refreshAfterCancellation = true;
+                    return;
+                }
                 if (!useWallet && available >= total && wallet.currentDeduction &&
-                    !await palaceConfirm('改以其他付款方式，原訂單已扣抵金額將退回儲值餘額，確定送出？')) return;
+                    !await palaceConfirm('改以其他付款方式，原訂單已扣抵金額將退回儲值餘額，確定送出？')) {
+                    refreshAfterCancellation = true;
+                    return;
+                }
             }
         }
         if (store !== currentStoreId || token !== currentIdToken || user !== currentUser || isMenuLocked) return;
@@ -1409,6 +1426,7 @@ async function submitMyOrderToCloud() {
         };
 
         payload.requestId = stableWalletRequestId('order', payload);
+        updateStatus("syncing", "正在寫入訂單...");
         const resp = await fetch(GOOGLE_GAS_API_URL, {
             method: "POST",
             headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -1421,6 +1439,18 @@ async function submitMyOrderToCloud() {
         if (resJson.status === "success") {
             clearWalletRequest('order');
             if (resJson.wallet) { walletData = resJson.wallet; renderWalletUI(); }
+            // 使用寫入成功回傳的最新資料，避免再次讀取整份訂單。
+            if (Array.isArray(resJson.data.menuData)) MENU_DATA = resJson.data.menuData;
+            if (typeof resJson.data.isLocked === 'boolean') {
+                isMenuLocked = resJson.data.isLocked;
+                document.getElementById('locked-notice-banner').style.display = isMenuLocked ? 'block' : 'none';
+            }
+            if (resJson.data.storeInfo) {
+                Object.defineProperty(ALL_STORES, store, {
+                    value: resJson.data.storeInfo, enumerable: true, configurable: true, writable: true
+                });
+                renderStoreSelect(); updateBrand();
+            }
             members = resJson.data.members || [];
             orders = resJson.data.orders || {};
             orderPayments = resJson.data.payments || {};
@@ -1436,7 +1466,7 @@ async function submitMyOrderToCloud() {
                     (resJson.wallet ? '\n付款方式：'+(payload.useWallet ? '儲值全額扣抵' : '其他付款方式')+
                     '\n目前儲值餘額：NT$ '+formatAmount(resJson.wallet.balance) : ''),
                 {title: '訂單送出結果'});
-            await fetchFromGoogleDrive(false);
+
         } else {
             throw new Error(resJson.message);
         }
@@ -1447,6 +1477,10 @@ async function submitMyOrderToCloud() {
     } finally {
         isSubmitting = false;
         updateUserModeUI();
+        if (refreshAfterCancellation) {
+            updateStatus("online", "已取消送出，正在重新整理...");
+            await fetchFromGoogleDrive(true);
+        }
     }
 }
 
