@@ -948,6 +948,7 @@ async function saveAnnouncementEditor(disable = false) {
     setAnnouncementEditorBusy(true);
     updateUserModeUI();
     announcementEditorStatus('正在儲存公告…');
+    let completionMessage = '';
     try {
         const response = await fetch(GOOGLE_GAS_API_URL, {method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},redirect:'follow',
             body:JSON.stringify({action:'admin_save_announcement',idToken:token,title,message,version:announcementEditorVersion})});
@@ -955,7 +956,8 @@ async function saveAnnouncementEditor(disable = false) {
         if (token !== currentIdToken || !isCurrentUserAdmin) return;
         if (result.status !== 'success') throw new Error(result.message || '公告儲存失敗');
         fillAnnouncementEditor(result.data);
-        announcementEditorStatus(systemAnnouncement ? '公告已儲存，之後開啟網站會顯示新內容。' : '公告已停用，之後開啟網站不會彈出公告。');
+        completionMessage = systemAnnouncement ? '公告已儲存，之後開啟網站會顯示新內容。' : '公告已停用，之後開啟網站不會彈出公告。';
+        document.getElementById('announcement-editor').close();
     } catch (error) {
         // 保留未儲存的文字，讓使用者檢查或重試。
         announcementEditorStatus('儲存失敗：'+error.message);
@@ -964,6 +966,7 @@ async function saveAnnouncementEditor(disable = false) {
         setAnnouncementEditorBusy(false);
         updateUserModeUI();
     }
+    if (completionMessage) await palaceAlert(completionMessage, {title:'系統公告操作結果'});
 }
 function triggerGoogleSignIn() {
     if (isSubmitting) return;
