@@ -515,6 +515,12 @@ body, button, input, select, textarea.summary-text,
             <label for="admin-member-select">訂購人</label>
             <select id="admin-member-select" class="select-store" onchange="renderAdminOrderEditor()"></select>
             <p id="admin-order-message"></p>
+            <label for="admin-order-payment">付款方式</label>
+            <select id="admin-order-payment" class="select-store">
+                <option value="other">其他付款方式</option>
+                <option value="wallet">儲值全額扣抵</option>
+            </select>
+            <p id="admin-order-payment-info" style="white-space:pre-wrap"></p>
             <div id="admin-order-items"></div>
             <label for="admin-order-note">訂單備註</label>
             <textarea id="admin-order-note" class="summary-text" maxlength="200" style="height:80px;min-height:80px"></textarea>
@@ -524,6 +530,27 @@ body, button, input, select, textarea.summary-text,
             <button class="btn-primary" id="btn-admin-save-member" onclick="saveAdminMemberOrder()">儲存修改</button>
             <button class="btn-danger" id="btn-admin-delete-member" onclick="deleteAdminMemberOrder()">刪除此人訂單</button>
             <button class="btn-secondary" onclick="closeModal('admin-orders-modal')">關閉</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="admin-restart-modal">
+    <div class="modal-content">
+        <div class="modal-header"><h3>重啟訂單</h3><button class="btn-secondary" onclick="closeModal('admin-restart-modal')">×</button></div>
+        <div class="modal-body">
+            <p>將清空此店家所有同仁的點餐資料，並自動解鎖菜單。已扣抵金額不退回，儲值交易紀錄會保留。</p>
+            <label for="admin-restart-wallet">新一輪訂單是否開啟抵扣儲值金？</label>
+            <select id="admin-restart-wallet" class="select-store">
+                <option value="yes">是，開啟抵扣儲值金</option>
+                <option value="no">否，下單直接送出</option>
+            </select>
+            <p>選「否」後，下單不檢查儲值餘額，也不顯示儲值付款選擇。</p>
+            <label for="admin-restart-confirm">請輸入 RESET 確認重啟</label>
+            <input id="admin-restart-confirm" class="select-store" autocomplete="off">
+        </div>
+        <div class="modal-footer">
+            <button class="btn-danger" onclick="confirmAdminRestart()">確認重啟</button>
+            <button class="btn-secondary" onclick="closeModal('admin-restart-modal')">取消</button>
         </div>
     </div>
 </div>
@@ -686,6 +713,8 @@ let members = [];
 let orders = {};
 let walletData = null;
 let orderPayments = {};
+let walletEnabled = true;
+let orderWalletEligibility = {};
 let orderNotes = {};
 let currentUser = "";
 let currentUserEmail = "";
@@ -1181,6 +1210,9 @@ function switchStore() {
 
     currentStoreId = newStore;
     orderPayments = {};
+    walletEnabled = true;
+    orderWalletEligibility = {};
+    closeModal('admin-restart-modal');
     refreshWallet();
     const url = new URL(window.location);
     url.searchParams.set('store', newStore);
@@ -1280,6 +1312,8 @@ async function fetchFromGoogleDrive(isManual = false) {
             members = data.members || [];
             orders = data.orders || {};
             orderPayments = data.payments || {};
+            walletEnabled = data.walletEnabled !== false;
+            orderWalletEligibility = data.walletEligibility || {};
             orderNotes = { ...(data.notes && typeof data.notes === 'object' ? data.notes : {}), ...(data.orderNotes && typeof data.orderNotes === 'object' ? data.orderNotes : {}) };
             isMenuLocked = data.isLocked || false;
             MENU_DATA = data.menuData || [];
@@ -1507,7 +1541,7 @@ async function submitMyOrderToCloud() {
         const memberOrders = JSON.parse(JSON.stringify(orders[user] || {}));
         const total = Math.round(MENU_DATA.reduce((s,i)=>s+Number(memberOrders[i.id] || 0)*Number(i.price),0)*100)/100;
         let useWallet = false;
-        if (!isGuestModeActive) {
+        if (!isGuestModeActive && walletEnabled) {
             const wallet = await refreshWallet(true);
             if (!wallet || store !== currentStoreId || token !== currentIdToken || user !== currentUser) return;
             const available = Math.round((wallet.balance+wallet.currentDeduction)*100)/100;
@@ -1579,6 +1613,8 @@ async function submitMyOrderToCloud() {
             members = resJson.data.members || [];
             orders = resJson.data.orders || {};
             orderPayments = resJson.data.payments || {};
+            walletEnabled = resJson.data.walletEnabled !== false;
+            orderWalletEligibility = resJson.data.walletEligibility || {};
             orderNotes = {...(resJson.data.notes || {}), ...(resJson.data.orderNotes || {})};
             const removed = !members.includes(currentUser);
             saveLocal();
@@ -1588,7 +1624,7 @@ async function submitMyOrderToCloud() {
             palaceAlert(removed ? '訂單金額為 0，已清除此店家的訂購人資料、餐點與備註。'
                 : buildMyOrderReceipt(payload.storeName, payload.targetMember, payload.menuSummary,
                     orders[payload.targetMember] || {}, orderNotes[payload.targetMember]) +
-                    (resJson.wallet ? '\n付款方式：'+(payload.useWallet ? '儲值全額扣抵' : '其他付款方式')+
+                    (resJson.wallet ? '\n付款方式：'+(orderPayments[payload.targetMember] ? '儲值全額扣抵' : '其他付款方式')+
                     '\n目前儲值餘額：NT$ '+formatAmount(resJson.wallet.balance) : ''),
                 {title: '訂單送出結果'});
 
@@ -1659,6 +1695,8 @@ async function adminAction(action, confirmMsg, details = {}) {
             members = resJson.data.members || [];
             orders = resJson.data.orders || {};
             orderPayments = resJson.data.payments || {};
+            walletEnabled = resJson.data.walletEnabled !== false;
+            orderWalletEligibility = resJson.data.walletEligibility || {};
             orderNotes = {...(resJson.data.notes || {}), ...(resJson.data.orderNotes || {})};
             isMenuLocked = !!resJson.data.isLocked;
             saveLocal(); renderTable(); calculateAll(); renderOrderNotes();
@@ -1691,13 +1729,23 @@ async function clearMyOrder() {
     }
 }
 
-async function adminClearAllOrders() {
-    const promptResponse = await palacePrompt("⚠️ 注意：此動作將清空此店家【所有同仁的點餐資料】並【自動解鎖菜單】重新開放點餐！已扣抵金額不退回，儲值交易紀錄會保留。\n\n請輸入 `RESET` 確認執行：");
-    if (promptResponse === "RESET") {
-        adminAction('admin_clear_all', null);
-    } else if (promptResponse !== null) {
-        palaceAlert("輸入代碼不符，操作已取消。");
+let adminRestartStore = '';
+function adminClearAllOrders() {
+    if (!isCurrentUserAdmin || isSubmitting) return;
+    adminRestartStore = currentStoreId;
+    document.getElementById('admin-restart-wallet').value = walletEnabled ? 'yes' : 'no';
+    document.getElementById('admin-restart-confirm').value = '';
+    document.getElementById('admin-restart-modal').style.display = 'flex';
+}
+
+async function confirmAdminRestart() {
+    if (!isCurrentUserAdmin || isSubmitting || adminRestartStore !== currentStoreId) return;
+    if (document.getElementById('admin-restart-confirm').value !== 'RESET') {
+        await palaceAlert('請輸入 RESET 確認重啟。'); return;
     }
+    const enabled = document.getElementById('admin-restart-wallet').value === 'yes';
+    closeModal('admin-restart-modal');
+    await adminAction('admin_clear_all', null, {walletEnabled:enabled});
 }
 
 function adminLockMenu() {
@@ -1712,7 +1760,7 @@ let adminEditorStore = '';
 let adminEditorInputs = [];
 
 function setAdminEditorBusy(busy) {
-    ['btn-admin-save-member', 'btn-admin-delete-member', 'admin-member-select', 'admin-order-note'].forEach(id => {
+    ['btn-admin-save-member', 'btn-admin-delete-member', 'admin-member-select', 'admin-order-note', 'admin-order-payment'].forEach(id => {
         document.getElementById(id).disabled = busy || !document.getElementById('admin-member-select').value;
     });
     adminEditorInputs.forEach(({input, buttons, control}) => {
@@ -1745,6 +1793,14 @@ function renderAdminOrderEditor() {
     message.textContent = member ? '' : '目前沒有可管理的使用者訂單。';
     message.style.display = member ? 'none' : 'block';
     document.getElementById('admin-order-note').value = member ? normalizeOrderNote(orderNotes[member]) : '';
+    const payment = member ? orderPayments[member] : null;
+    const paymentSelect = document.getElementById('admin-order-payment');
+    paymentSelect.value = payment ? 'wallet' : 'other';
+    paymentSelect.querySelector('option[value="wallet"]').disabled = !walletEnabled || !orderWalletEligibility[member];
+    document.getElementById('admin-order-payment-info').textContent = !member ? '' :
+        '目前付款方式：' + (payment ? '儲值全額扣抵（NT$ ' + formatAmount(payment.amountCents / 100) + '）' : '其他付款方式') +
+        (!walletEnabled ? '\n此輪訂單未開啟抵扣儲值金。' : !orderWalletEligibility[member] ? '\n此訂單沒有可驗證的 Google 帳號，無法改用儲值扣抵。' : '') +
+        '\n改用其他付款方式會退回原扣抵金額；改用儲值會檢查訂購者餘額並扣款。';
     if (member) {
         const known = new Set(MENU_DATA.map(item => item.id));
         const items = [...MENU_DATA, ...Object.keys(orders[member] || {}).filter(id => !known.has(id))
@@ -1811,6 +1867,7 @@ async function saveAdminMemberOrder() {
         ? '修改後金額為 0，將清除 ' + member + ' 的訂單、姓名與備註，確定繼續？'
         : '確定儲存 ' + member + ' 的訂單修改？', {
         targetMember: member, memberOrders,
+        useWallet: document.getElementById('admin-order-payment').value === 'wallet',
         orderNote: normalizeOrderNote(document.getElementById('admin-order-note').value)
     });
 }
