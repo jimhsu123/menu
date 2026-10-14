@@ -384,6 +384,7 @@ body, button, input, select, textarea.summary-text,
 #admin-wallet-modal input:focus,
 #admin-wallet-modal input:focus-visible { outline:none; box-shadow:none; border-color:#986b28; }
 #admin-wallet-modal .wallet-form-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; margin-bottom:4px; }
+#announcement-message {display:block;width:100%;padding:11px 12px;border:1px solid #c7af80;border-radius:3px;background:#fffdf8;color:#382723;font:inherit;font-size:15px;resize:vertical;min-height:150px;}
 </style>
 </head>
 <body>
@@ -546,6 +547,22 @@ body, button, input, select, textarea.summary-text,
 
 
 <!-- 原生 dialog 提供焦點限制與背景隔離，文字以 textContent 安全填入。 -->
+
+<dialog id="google-reauth-dialog" class="palace-dialog" aria-labelledby="google-reauth-title">
+ <div class="palace-dialog-top"><h2 id="google-reauth-title">重新登入 Google 帳號</h2><button type="button" class="palace-dialog-close" aria-label="關閉登入視窗" onclick="document.getElementById('google-reauth-dialog').close()">×</button></div>
+ <div class="palace-dialog-body"><p id="google-reauth-message" class="palace-dialog-message"></p><div id="google-reauth-button" style="margin-top:16px;min-height:44px"></div></div>
+ <div class="palace-dialog-actions"><button type="button" class="btn-secondary" onclick="triggerGoogleSignIn()">再試一次</button><button type="button" class="btn-secondary" onclick="document.getElementById('google-reauth-dialog').close()">取消</button></div>
+</dialog>
+<dialog id="announcement-editor" class="palace-dialog" aria-labelledby="announcement-editor-title" oncancel="if(isSubmitting || announcementEditorLoading) event.preventDefault()">
+ <div class="palace-dialog-top"><h2 id="announcement-editor-title">系統公告管理</h2><button type="button" id="announcement-close" class="palace-dialog-close" aria-label="關閉公告管理" onclick="closeAnnouncementEditor()">×</button></div>
+ <div class="palace-dialog-body">
+  <div class="palace-dialog-field"><label for="announcement-title">公告標題</label><input id="announcement-title" maxlength="100" placeholder="系統公告"></div>
+  <div class="palace-dialog-field"><label for="announcement-message">公告內容</label><textarea id="announcement-message" maxlength="10000" rows="7" placeholder="輸入公告內容，可換行。"></textarea></div>
+  <p style="margin-top:10px;color:var(--text-muted);font-size:13px">儲存後，使用者再次開啟網站就會看到公告。空白內容代表停用公告。</p>
+  <p id="announcement-editor-status" role="status" style="margin-top:12px;white-space:pre-wrap"></p>
+ </div>
+ <div class="palace-dialog-actions"><button type="button" id="announcement-reload" class="btn-secondary" onclick="openSystemAnnouncement()">重新讀取</button><button type="button" id="announcement-disable" class="btn-danger-outline" onclick="saveAnnouncementEditor(true)">停用公告</button><button type="button" id="announcement-save" class="btn-primary" onclick="saveAnnouncementEditor()">儲存公告</button></div>
+</dialog>
 <dialog id="palace-dialog" class="palace-dialog" aria-labelledby="palace-dialog-title" aria-describedby="palace-dialog-message">
   <div class="palace-dialog-top">
     <h2 id="palace-dialog-title">操作確認</h2>
@@ -838,25 +855,102 @@ function showStartupAnnouncement() {
     startupAnnouncementShown = true;
     void palaceAlert(systemAnnouncement.message, {title:systemAnnouncement.title || '系統公告'});
 }
+
+
+let announcementEditorVersion = '';
+let announcementEditorLoading = false;
+function announcementEditorStatus(message) {
+    document.getElementById('announcement-editor-status').textContent = message;
+}
+function setAnnouncementEditorBusy(busy) {
+    ['announcement-title','announcement-message','announcement-save','announcement-disable','announcement-reload','announcement-close']
+        .forEach(id => document.getElementById(id).disabled = busy);
+}
+function fillAnnouncementEditor(data) {
+    const notice = data.announcement;
+    announcementEditorVersion = data.version;
+    document.getElementById('announcement-title').value = notice ? notice.title : '系統公告';
+    document.getElementById('announcement-message').value = notice ? notice.message : '';
+    systemAnnouncement = notice && notice.message ? notice : null;
+}
 async function openSystemAnnouncement() {
-    if (!isCurrentUserAdmin) return;
-    const button = document.getElementById('btn-system-announcement');
-    if (button.disabled) return;
-    button.disabled = true;
-    button.textContent = '公告讀取中…';
+    if (!isCurrentUserAdmin || isSubmitting || announcementEditorLoading) return;
+    if (!currentIdToken || !isTokenValid(currentIdToken)) { triggerGoogleSignIn(); return; }
+    const dialog = document.getElementById('announcement-editor');
+    if (!dialog.open) dialog.showModal();
+    announcementEditorVersion = '';
+    announcementEditorLoading = true;
+    setAnnouncementEditorBusy(true);
+    announcementEditorStatus('正在讀取公告…');
+    const token = currentIdToken;
     try {
-        const resp = await fetch(GOOGLE_GAS_API_URL+'?action=get_announcement', {method:'GET',redirect:'follow'});
-        const result = await resp.json();
+        const response = await fetch(GOOGLE_GAS_API_URL, {method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},redirect:'follow',
+            body:JSON.stringify({action:'admin_get_announcement',idToken:token})});
+        const result = await response.json();
+        if (token !== currentIdToken || !isCurrentUserAdmin) { dialog.close(); return; }
         if (result.status !== 'success') throw new Error(result.message || '公告讀取失敗');
-        if (!isCurrentUserAdmin) return;
-        systemAnnouncement = result.data || null;
-        void palaceAlert(systemAnnouncement && systemAnnouncement.message ? systemAnnouncement.message : '目前沒有系統公告。',
-            {title:systemAnnouncement && systemAnnouncement.title || '系統公告'});
+        fillAnnouncementEditor(result.data);
+        announcementEditorStatus(systemAnnouncement ? '公告顯示中，可修改後儲存。' : '目前沒有顯示中的公告。');
     } catch (error) {
-        if (isCurrentUserAdmin) void palaceAlert('無法讀取系統公告：'+error.message, {title:'系統公告'});
+        announcementEditorStatus('無法讀取公告：'+error.message);
     } finally {
-        button.disabled = false;
-        button.textContent = '系統公告';
+        announcementEditorLoading = false;
+        setAnnouncementEditorBusy(false);
+        document.getElementById('announcement-save').disabled = !announcementEditorVersion;
+        document.getElementById('announcement-disable').disabled = !announcementEditorVersion;
+    }
+}
+function closeAnnouncementEditor() {
+    if (isSubmitting || announcementEditorLoading) return;
+    document.getElementById('announcement-editor').close();
+}
+async function saveAnnouncementEditor(disable = false) {
+    if (!isCurrentUserAdmin || isSubmitting || announcementEditorLoading || !announcementEditorVersion) return;
+    if (!currentIdToken || !isTokenValid(currentIdToken)) { triggerGoogleSignIn(); return; }
+    const title = document.getElementById('announcement-title').value;
+    const message = disable ? '' : document.getElementById('announcement-message').value;
+    if (title.trim().length > 100 || message.trim().length > 10000) { announcementEditorStatus('公告標題最多 100 字，內容最多 10000 字。'); return; }
+    const token = currentIdToken;
+    isSubmitting = true;
+    setAnnouncementEditorBusy(true);
+    updateUserModeUI();
+    announcementEditorStatus('正在儲存公告…');
+    try {
+        const response = await fetch(GOOGLE_GAS_API_URL, {method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},redirect:'follow',
+            body:JSON.stringify({action:'admin_save_announcement',idToken:token,title,message,version:announcementEditorVersion})});
+        const result = await response.json();
+        if (token !== currentIdToken || !isCurrentUserAdmin) return;
+        if (result.status !== 'success') throw new Error(result.message || '公告儲存失敗');
+        fillAnnouncementEditor(result.data);
+        announcementEditorStatus(systemAnnouncement ? '公告已儲存，之後開啟網站會顯示新內容。' : '公告已停用，之後開啟網站不會彈出公告。');
+    } catch (error) {
+        // 保留未儲存的文字，讓使用者檢查或重試。
+        announcementEditorStatus('儲存失敗：'+error.message);
+    } finally {
+        isSubmitting = false;
+        setAnnouncementEditorBusy(false);
+        updateUserModeUI();
+    }
+}
+function triggerGoogleSignIn() {
+    if (isSubmitting) return;
+    const dialog = document.getElementById('google-reauth-dialog');
+    const message = document.getElementById('google-reauth-message');
+    const container = document.getElementById('google-reauth-button');
+    if (!dialog.open) dialog.showModal();
+    container.replaceChildren();
+    if (!window.google || !google.accounts || !google.accounts.id) {
+        message.textContent = 'Google 登入服務尚未載入，請稍後按「再試一次」。';
+        return;
+    }
+    try {
+        initGoogleSignIn();
+        if (!isGsiInitialized) throw new Error('登入服務初始化失敗');
+        google.accounts.id.renderButton(container, {theme:'outline',size:'large',text:'signin_with',shape:'rectangular',width:Math.min(280,Math.max(200,container.clientWidth || 280))});
+        message.textContent = '請點下方 Google 按鈕選擇帳號，更新登入憑證。';
+    } catch (error) {
+        message.textContent = '無法載入 Google 登入，請按「再試一次」。';
+        console.warn('重新登入服務異常', error);
     }
 }
 
@@ -909,13 +1003,7 @@ function showManualLoginOption() {
     }
 }
 
-function triggerGoogleSignIn() {
-    if (window.google && google.accounts && google.accounts.id) {
-        google.accounts.id.prompt();
-    } else {
-        enterGuestMode();
-    }
-}
+
 
 async function handleCredentialResponse(response) {
     if (isSubmitting) return;
@@ -928,6 +1016,8 @@ async function handleCredentialResponse(response) {
         return;
     }
 
+    const reauthDialog = document.getElementById('google-reauth-dialog');
+    if (reauthDialog.open) reauthDialog.close();
     currentUser = decodedToken.name || decodedToken.given_name || decodedToken.email.split('@')[0];
     currentUserEmail = decodedToken.email || "";
     const avatarUrl = decodedToken.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser)}&background=3b82f6&color=fff`;
@@ -1041,6 +1131,8 @@ async function enterGuestMode() {
 function logout() {
     if (isSubmitting) return;
     closeModal('admin-orders-modal');
+    document.getElementById('announcement-editor').close();
+    document.getElementById('google-reauth-dialog').close();
     currentUser = "";
     currentUserEmail = "";
     currentIdToken = "";
