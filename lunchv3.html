@@ -794,7 +794,9 @@ function isTokenValid(token) {
     return decoded.exp > (nowSec + 60);
 }
 
-window.onload = async function() {
+document.addEventListener('DOMContentLoaded', async function() {
+    // 優先獨立讀取公告，不等待圖片、登入 SDK、店家列表或儲值交易檢查。
+    void loadStartupAnnouncement();
     updateStatus("syncing", "正在載入店家列表...");
     try {
         // 1. 還原先前的登入狀態
@@ -821,7 +823,7 @@ window.onload = async function() {
         console.error("初始化失敗:", error);
         updateStatus("offline", "初始化失敗：" + error.message);
     }
-};
+});
 
 /**
  * 恢復 localStorage 登入態
@@ -867,6 +869,23 @@ function clearSessionStorage() {
     localStorage.removeItem("menu_order_current_avatar");
 }
 
+let startupAnnouncementLoaded = false;
+async function loadStartupAnnouncement() {
+    try {
+        const resp = await fetch(`${GOOGLE_GAS_API_URL}?action=get_announcement`, {
+            method: 'GET', redirect: 'follow'
+        });
+        const result = await resp.json();
+        if (result.status !== 'success') throw new Error(result.message || '公告讀取失敗');
+        startupAnnouncementLoaded = true;
+        systemAnnouncement = result.data || null;
+        showStartupAnnouncement();
+    } catch (error) {
+        // 公告專用接口失敗時，仍可由店家列表回傳的公告補上。
+        console.warn('優先讀取公告失敗：', error);
+    }
+}
+
 async function loadStoreList() {
     const resp = await fetch(`${GOOGLE_GAS_API_URL}?action=get_stores`, {
         method: "GET",
@@ -875,7 +894,7 @@ async function loadStoreList() {
     const resJson = await resp.json();
     if (resJson.status === "success") {
         ALL_STORES = resJson.data;
-        systemAnnouncement = resJson.announcement || null;
+        if (!startupAnnouncementLoaded) systemAnnouncement = resJson.announcement || null;
         // 不等待使用者關閉公告，初始化與菜單載入繼續進行。
         showStartupAnnouncement();
     } else {
