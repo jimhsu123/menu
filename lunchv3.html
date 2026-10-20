@@ -716,6 +716,7 @@ let MENU_DATA = [];
 let members = [];
 let orders = {};
 let walletData = null;
+let walletSnapshot = {store:'',token:'',time:0};
 let orderPayments = {};
 let walletEnabled = true;
 let orderWalletEligibility = {};
@@ -1568,7 +1569,10 @@ async function submitMyOrderToCloud() {
         const total = Math.round(MENU_DATA.reduce((s,i)=>s+Number(memberOrders[i.id] || 0)*Number(i.price),0)*100)/100;
         let useWallet = false;
         if (!isGuestModeActive && walletEnabled) {
-            const wallet = await refreshWallet(true);
+            const freshWallet = walletData && walletData.email === currentUserEmail.toLowerCase().trim() &&
+                walletSnapshot.store === store && walletSnapshot.token === token && Date.now()-walletSnapshot.time < 30000 &&
+                Number(walletData.currentDeduction || 0) === Number(orderPayments[user]?.amountCents || 0)/100;
+            const wallet = freshWallet ? walletData : await refreshWallet(true);
             if (!wallet || store !== currentStoreId || token !== currentIdToken || user !== currentUser) return;
             const available = Math.round((wallet.balance+wallet.currentDeduction)*100)/100;
             if (total > 0 && (wallet.balance > 0 || wallet.currentDeduction > 0)) {
@@ -1623,7 +1627,7 @@ async function submitMyOrderToCloud() {
         if (store !== currentStoreId || token !== currentIdToken || user !== currentUser) return;
         if (resJson.status === "success") {
             clearWalletRequest('order');
-            if (resJson.wallet) { walletData = resJson.wallet; renderWalletUI(); }
+            if (resJson.wallet) { walletData = resJson.wallet; walletSnapshot = {store:currentStoreId,token:currentIdToken,time:Date.now()}; renderWalletUI(); }
             // 使用寫入成功回傳的最新資料，避免再次讀取整份訂單。
             if (Array.isArray(resJson.data.menuData)) MENU_DATA = resJson.data.menuData;
             if (typeof resJson.data.isLocked === 'boolean') {
@@ -1716,7 +1720,7 @@ async function adminAction(action, confirmMsg, details = {}) {
         const resJson = await resp.json();
         if (resJson.status === "success") {
             clearWalletRequest('admin-order');
-            if (resJson.wallet) { walletData = resJson.wallet; renderWalletUI(); }
+            if (resJson.wallet) { walletData = resJson.wallet; walletSnapshot = {store:currentStoreId,token:currentIdToken,time:Date.now()}; renderWalletUI(); }
             updateStatus("online", "管理員操作完成！");
             members = resJson.data.members || [];
             orders = resJson.data.orders || {};
@@ -2145,6 +2149,7 @@ if (typeof ResizeObserver !== 'undefined') {
 
 function resetWalletUI() {
     walletData = null;
+    walletSnapshot = {store:'',token:'',time:0};
     document.getElementById('wallet-panel').style.display = 'none';
     document.getElementById('wallet-history-body').replaceChildren();
     document.getElementById('admin-wallet-list').replaceChildren();
@@ -2172,7 +2177,9 @@ async function refreshWallet(required = false, includeHistory = false) {
     try {
         const data = await walletApi('get_wallet',{storeId:store,includeHistory});
         if (store !== currentStoreId) return null;
-        walletData = data; renderWalletUI(); return data;
+        walletData = data;
+        walletSnapshot = {store,token:currentIdToken,time:Date.now()};
+        renderWalletUI(); return data;
     } catch (e) {
         walletData = null; renderWalletUI();
         if (required) throw new Error('無法確認儲值餘額：'+e.message);
