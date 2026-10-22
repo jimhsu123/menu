@@ -572,6 +572,7 @@ body, button, input, select, textarea.summary-text,
         </div>
         <div class="modal-footer">
             <button class="btn-success" onclick="copyShareText()">複製到剪貼簿</button>
+            <button class="btn-secondary" id="btn-google-chat-charge-notify" onclick="notifyGoogleChatCharge()" style="display:none">Google chat收費通知</button>
             <button class="btn-secondary" onclick="closeModal('share-modal')">關閉</button>
         </div>
     </div>
@@ -1986,7 +1987,26 @@ function openShareModal() {
     text += `請大家備好零錢或透過 LINE Pay 轉帳，謝謝！`;
 
     document.getElementById("share-text-area").value = text;
+    document.getElementById('btn-google-chat-charge-notify').style.display = isCurrentUserAdmin && !isGuestModeActive ? '' : 'none';
     document.getElementById("share-modal").style.display = "flex";
+}
+
+async function notifyGoogleChatCharge() {
+    if (!isCurrentUserAdmin || isGuestModeActive || isSubmitting || !currentStoreId) return;
+    const storeId = currentStoreId, token = currentIdToken;
+    const button = document.getElementById('btn-google-chat-charge-notify');
+    const message = document.getElementById('share-text-area').value;
+    if (!message.trim()) { palaceAlert('收費明細內容為空，無法發送。'); return; }
+    isSubmitting = true; updateUserModeUI(); button.textContent = '通知發送中…';
+    try {
+        const data = await walletApi('admin_notify_google_chat_charge', {storeId, message});
+        if (token !== currentIdToken || storeId !== currentStoreId) return;
+        await palaceAlert(data.message);
+    } catch (error) {
+        await palaceAlert('收費通知未完成：' + error.message);
+    } finally {
+        isSubmitting = false; button.textContent = 'Google chat收費通知'; updateUserModeUI();
+    }
 }
 
 function copyShareText() {
