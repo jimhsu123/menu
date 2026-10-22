@@ -1687,7 +1687,8 @@ async function notifyGoogleChatOrders() {
     updateUserModeUI();
     button.textContent = '通知發送中…';
     try {
-        const data = await walletApi('admin_notify_google_chat', {storeId});
+        const pageParams = new URLSearchParams(window.location.search).toString();
+        const data = await walletApi('admin_notify_google_chat', {storeId, pageParams});
         if (token !== currentIdToken || storeId !== currentStoreId) return;
         await palaceAlert(data.message);
     } catch (error) {
