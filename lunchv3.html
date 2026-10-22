@@ -15,7 +15,7 @@
 ">
 <title>午餐團｜多人點餐</title>
 <!-- 引入 Google Identity Services (GIS) SDK -->
-<!-- GIS 在頁尾載入，確保登入介面與狀態變數已建立。 -->
+<script src="https://accounts.google.com/gsi/client" async defer onload="initGoogleSignIn()"></script>
 <style>
 :root {
   --bg-dark: #121418;--card-bg: #1c1f26;--border-color: #2e3440;--accent-orange: #f97316;
@@ -409,7 +409,8 @@ body, button, input, select, textarea.summary-text,
             <select id="store-select" class="select-store" onchange="switchStore()"></select>
 
             <div id="google-login-container">
-                <div id="g_id_signin" aria-label="Google 帳戶登入"><span role="status">Google 登入載入中…</span></div>
+                <div id="g_id_signin"></div>
+                <button id="btn-manual-login" class="btn-primary" style="display:none;" onclick="triggerGoogleSignIn()">🔑 重新授權 / 登入</button>
                 <div id="user-info">
                     <img id="user-avatar" src="" alt="avatar">
                     <span id="user-name-display"></span>
@@ -417,7 +418,7 @@ body, button, input, select, textarea.summary-text,
                 </div>
             </div>
 
-            <button class="btn-submit-main" id="btn-submit-order" style="display:none;" onclick="submitMyOrderToCloud()" disabled>送出我的點餐</button>
+            <button class="btn-submit-main" id="btn-submit-order" onclick="submitMyOrderToCloud()" disabled>送出我的點餐</button>
             <div id="wallet-panel" class="wallet-inline" style="display:none">
               <strong id="wallet-balance">儲值餘額載入中</strong>
               <button class="btn-secondary" onclick="openWalletHistory()">儲值／扣抵紀錄</button>
@@ -434,6 +435,7 @@ body, button, input, select, textarea.summary-text,
     <!-- Admin Panel (管理員面板) -->
     <div class="admin-panel" id="admin-controls-panel">
         <span class="admin-panel-title">⭐ 管理員面板</span>
+        <button type="button" class="btn-secondary" id="btn-google-chat-notify" onclick="notifyGoogleChatOrders()">Google chat點餐通知</button>
         <button class="btn-secondary" id="btn-system-announcement" onclick="openSystemAnnouncement()">系統公告</button>
         <button class="btn-secondary" onclick="openAdminWallets()">Google 帳號儲值管理</button>
         <button class="btn-secondary" onclick="openAdminOrders()">修改／刪除使用者訂單</button>
@@ -579,7 +581,7 @@ body, button, input, select, textarea.summary-text,
 <!-- 原生 dialog 提供焦點限制與背景隔離，文字以 textContent 安全填入。 -->
 
 <dialog id="google-reauth-dialog" class="palace-dialog" aria-labelledby="google-reauth-title">
- <div class="palace-dialog-top"><h2 id="google-reauth-title">登入 Google 帳號</h2><button type="button" class="palace-dialog-close" aria-label="關閉登入視窗" onclick="document.getElementById('google-reauth-dialog').close()">×</button></div>
+ <div class="palace-dialog-top"><h2 id="google-reauth-title">重新登入 Google 帳號</h2><button type="button" class="palace-dialog-close" aria-label="關閉登入視窗" onclick="document.getElementById('google-reauth-dialog').close()">×</button></div>
  <div class="palace-dialog-body"><p id="google-reauth-message" class="palace-dialog-message"></p><div id="google-reauth-button" style="margin-top:16px;min-height:44px"></div></div>
  <div class="palace-dialog-actions"><button type="button" class="btn-secondary" onclick="triggerGoogleSignIn()">再試一次</button><button type="button" class="btn-secondary" onclick="document.getElementById('google-reauth-dialog').close()">取消</button></div>
 </dialog>
@@ -842,6 +844,7 @@ function restoreSessionFromStorage() {
                 currentUserEmail = savedEmail || "";
 
                 document.getElementById('g_id_signin').style.display = 'none';
+                document.getElementById('btn-manual-login').style.display = 'none';
                 document.getElementById('user-info').style.display = 'flex';
                 document.getElementById('user-avatar').src = savedAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser)}&background=3b82f6&color=fff`;
                 document.getElementById('user-name-display').innerText = `${currentUser}`;
@@ -851,8 +854,9 @@ function restoreSessionFromStorage() {
                 verifyUserRoleWithBackend(currentIdToken);
             } else {
                 console.warn("本機 Token 已過期，需重新登入刷新憑證。");
-                // 憑證過期時顯示同一個 Google 官方登入入口。
-                document.getElementById('g_id_signin').style.display = 'inline-flex';
+                // 標記需要刷新，但保留頭像與名稱給予友善提示
+                document.getElementById('btn-manual-login').style.display = 'inline-flex';
+                document.getElementById('btn-manual-login').innerText = "🔑 憑證過期，請點此重新登入";
             }
         }
     } catch (e) {
@@ -993,14 +997,14 @@ function triggerGoogleSignIn() {
     if (!dialog.open) dialog.showModal();
     container.replaceChildren();
     if (!window.google || !google.accounts || !google.accounts.id) {
-        message.textContent = 'Google 登入服務尚未載入，請確認網路連線或瀏覽器是否阻擋 Google 登入，再按「再試一次」；若持續無法載入，請重新整理頁面。';
+        message.textContent = 'Google 登入服務尚未載入，請稍後按「再試一次」。';
         return;
     }
     try {
         initGoogleSignIn();
         if (!isGsiInitialized) throw new Error('登入服務初始化失敗');
         google.accounts.id.renderButton(container, {theme:'outline',size:'large',text:'signin_with',shape:'rectangular',width:Math.min(280,Math.max(200,container.clientWidth || 280))});
-        message.textContent = currentUser ? '請點下方 Google 按鈕選擇帳號，更新登入憑證。' : '請點下方 Google 按鈕選擇帳號，登入後即可點餐。';
+        message.textContent = '請點下方 Google 按鈕選擇帳號，更新登入憑證。';
     } catch (error) {
         message.textContent = '無法載入 Google 登入，請按「再試一次」。';
         console.warn('重新登入服務異常', error);
@@ -1021,38 +1025,41 @@ function init() {
 }
 
 function initGoogleSignIn() {
+    if (isGsiInitialized) return;
     try {
-        if (!window.google || !google.accounts || !google.accounts.id) return;
-        if (!isGsiInitialized) {
+        if (window.google && google.accounts && google.accounts.id) {
             google.accounts.id.initialize({
                 client_id: GOOGLE_CLIENT_ID,
                 callback: handleCredentialResponse,
                 auto_select: false
             });
+
             isGsiInitialized = true;
+            const btnContainer = document.getElementById('g_id_signin');
+            if (btnContainer && !currentUser) {
+                google.accounts.id.renderButton(btnContainer, { 
+                    theme: 'outline', 
+                    size: 'medium', 
+                    text: 'signin_with', 
+                    shape: 'pill' 
+                });
+            }
+        } else {
+            showManualLoginOption();
         }
-        const container = document.getElementById('g_id_signin');
-        if (container && container.dataset.rendered !== 'true') {
-            container.replaceChildren();
-            google.accounts.id.renderButton(container, {
-                type: 'standard', theme: 'outline', size: 'medium',
-                text: 'signin_with', shape: 'pill', locale: 'zh-TW'
-            });
-            container.dataset.rendered = 'true';
-        }
-    } catch (error) {
-        console.warn('Google 登入按鈕載入失敗', error);
-        showGoogleLoginError();
+    } catch (e) {
+        console.warn("GIS 初始化異常", e);
+        showManualLoginOption();
     }
 }
 
-function showGoogleLoginError() {
-    const container = document.getElementById('g_id_signin');
-    if (container) {
-        delete container.dataset.rendered;
-        container.textContent = 'Google 登入無法載入，請確認網路連線後重新整理。';
+function showManualLoginOption() {
+    if (!currentUser) {
+        const manualBtn = document.getElementById('btn-manual-login');
+        if (manualBtn) manualBtn.style.display = 'inline-flex';
     }
 }
+
 
 
 async function handleCredentialResponse(response) {
@@ -1080,6 +1087,7 @@ async function handleCredentialResponse(response) {
 
     // UI 切換
     document.getElementById('g_id_signin').style.display = 'none';
+    document.getElementById('btn-manual-login').style.display = 'none';
     document.getElementById('user-info').style.display = 'flex';
     document.getElementById('user-avatar').src = avatarUrl;
     document.getElementById('user-name-display').innerText = `${currentUser}`;
@@ -1135,6 +1143,7 @@ async function verifyUserRoleWithBackend(token) {
 }
 
 function renderAdminPanelUI() {
+    document.getElementById('btn-google-chat-notify').disabled = isSubmitting || !isCurrentUserAdmin || !currentStoreId || isMenuLocked;
     const adminPanel = document.getElementById('admin-controls-panel');
     if (isCurrentUserAdmin) {
         adminPanel.style.display = 'flex';
@@ -1159,6 +1168,7 @@ async function enterGuestMode() {
     clearSessionStorage();
 
     document.getElementById('g_id_signin').style.display = 'none';
+    document.getElementById('btn-manual-login').style.display = 'none';
     document.getElementById('user-info').style.display = 'flex';
     document.getElementById('user-avatar').src = "https://ui-avatars.com/api/?name=" + encodeURIComponent(currentUser) + "&background=3b82f6&color=fff";
     document.getElementById('user-name-display').innerText = `訪客: ${currentUser}`;
@@ -1190,7 +1200,8 @@ function logout() {
 
     clearSessionStorage();
 
-    document.getElementById('g_id_signin').style.display = 'none';
+    document.getElementById('g_id_signin').style.display = 'block';
+    document.getElementById('btn-manual-login').style.display = 'none';
     document.getElementById('user-info').style.display = 'none';
     document.getElementById('login-notice-banner').style.display = 'flex';
     document.getElementById('admin-controls-panel').style.display = 'none';
@@ -1281,20 +1292,15 @@ function updateStatus(type, msg) {
 }
 
 function updateUserModeUI() {
-    document.getElementById('g_id_signin').style.display = currentUser ? 'none' : 'inline-flex';
+    document.getElementById('btn-google-chat-notify').disabled = isSubmitting || !isCurrentUserAdmin || !currentStoreId || isMenuLocked;
     renderWalletUI();
     const historyButton = document.getElementById('btn-last-order');
     historyButton.style.display = currentUser ? 'inline-flex' : 'none';
     historyButton.disabled = !currentUser || isMenuLocked || isSubmitting || !MENU_DATA.length;
     const btnSubmit = document.getElementById('btn-submit-order');
-    btnSubmit.style.display = currentUser ? 'inline-flex' : 'none';
     const btnClearMyOrder = document.getElementById('btn-clear-my-order');
 
-    if (!currentUser) {
-        btnSubmit.disabled = true;
-        btnSubmit.innerText = '送出我的點餐';
-        btnClearMyOrder.disabled = true;
-    } else if (!isMenuLocked) {
+    if (currentUser && !isMenuLocked) {
         btnSubmit.disabled = isSubmitting;
         btnSubmit.innerText = isSubmitting ? "處理訂單中…" : `送出 ${currentUser} 的點餐`;
         btnClearMyOrder.disabled = isSubmitting;
@@ -1669,6 +1675,27 @@ async function submitMyOrderToCloud() {
             updateStatus("online", "已取消送出，正在重新整理...");
             await fetchFromGoogleDrive(true);
         }
+    }
+}
+
+async function notifyGoogleChatOrders() {
+    if (!isCurrentUserAdmin || isGuestModeActive || isSubmitting || !currentStoreId) return;
+    if (isMenuLocked) { palaceAlert('此店家已結單，請先解鎖菜單。'); return; }
+    const storeId = currentStoreId, token = currentIdToken;
+    const button = document.getElementById('btn-google-chat-notify');
+    isSubmitting = true;
+    updateUserModeUI();
+    button.textContent = '通知發送中…';
+    try {
+        const data = await walletApi('admin_notify_google_chat', {storeId});
+        if (token !== currentIdToken || storeId !== currentStoreId) return;
+        await palaceAlert(data.message);
+    } catch (error) {
+        await palaceAlert('點餐通知未完成：' + error.message);
+    } finally {
+        isSubmitting = false;
+        button.textContent = 'Google chat點餐通知';
+        updateUserModeUI();
     }
 }
 
@@ -2255,6 +2282,5 @@ async function adjustWallet() {
     finally{isSubmitting=false;updateUserModeUI();document.getElementById('wallet-adjust-button').disabled=false;}
 }
 </script>
-<script src="https://accounts.google.com/gsi/client" async defer onload="initGoogleSignIn()" onerror="showGoogleLoginError()"></script>
 </body>
 </html>
