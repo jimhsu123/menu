@@ -1958,7 +1958,7 @@ function openKitchenModal() {
 function buildShareText() {
     const storeInfo = ALL_STORES[currentStoreId] || { name: "點餐" };
     let text = `🍱【${storeInfo.name} 點餐收費名單】\n`;
-    text += `📅 統計時間：${new Date().toLocaleDateString('zh-TW')} ${new Date().toLocaleTimeString('zh-TW', {hour: '2-digit', minute:'2-digit'})}\n`;
+    text += `📅 統計時間：${new Date().toLocaleDateString('zh-TW')} ${new Date().toLocaleTimeString('zh-TW', {hour: '2-digit', minute:'2-digit', hourCycle:'h23'})}\n`;
     text += `------------------------------------\n`;
     let grandAmount = 0;
     let grandDue = 0;
